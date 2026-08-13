@@ -1,1 +1,28 @@
 .DS_Store
+
+# Secrets. .env.example is committed; .env never is.
+.env
+.env.*
+!.env.example
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Local data. Volumes live in Docker, but keep stray dumps out of the tree.
+*.dump
+*.sql.gz
+data/

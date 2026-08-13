@@ -1,7 +1,7 @@
 """add fx rates table
 
 Revision ID: 75094539199b
-Revises: dd16f5f8efd7
+Revises: b319bcb648e2
 Create Date: 2026-08-13 15:12:44.383858
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "75094539199b"
-down_revision: str | None = "dd16f5f8efd7"
+down_revision: str | None = "b319bcb648e2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -1,9 +1,8 @@
 """ARQ worker: scheduled jobs, cron schedules, Telegram polling (CLAUDE.md §6).
 
-Real jobs land here as their own issues close (#15 below; the M8 Telegram
-bot is still an asyncio loop to be added later). An ARQ worker with no jobs
-registered still runs and connects to Redis, but is otherwise a stub — the
-heartbeat cron exists only so ARQ has something to schedule until then.
+Reference data ingestion (#14) and FX rate ingestion (#15) are the first real
+scheduled jobs here; the M8 Telegram bot is still an asyncio loop to be added
+later, the same way.
 """
 
 import logging
@@ -13,6 +12,7 @@ from arq.connections import RedisSettings
 from arq.cron import cron
 
 from apps.worker.jobs.fx_rates import ingest_fx_rates
+from apps.worker.jobs.reference_data import ingest_reference_data
 from infrastructure.logging import configure_logging
 from infrastructure.settings import get_settings
 
@@ -42,9 +42,15 @@ class WorkerSettings:
     builds the actual Worker instance — not instantiated directly here.
     """
 
-    functions: list[Any] = [ingest_fx_rates]
+    # Both registered as functions too, not only cron jobs, so either can be
+    # triggered on demand later (e.g. an admin "refresh now" endpoint)
+    # without duplicating the ingestion logic.
+    functions: list[Any] = [ingest_reference_data, ingest_fx_rates]
     cron_jobs: list[Any] = [
         cron(heartbeat, minute=set(range(0, 60, 5))),
+        # Monthly, matching docs/providers.md's stated refresh cadence for
+        # OurAirports and OpenFlights — both change slowly.
+        cron(ingest_reference_data, day=1, hour=3, minute=0),
         # ECB publishes once per TARGET business day around 16:00 CET; running
         # a bit after that covers the publication with margin. The job
         # re-fetches the whole 90-day window every time (insert-or-skip), so

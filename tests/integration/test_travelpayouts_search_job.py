@@ -10,12 +10,16 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import select
 
-from apps.worker.jobs.travelpayouts_search import run_travelpayouts_search
+from apps.worker.jobs.travelpayouts_search import SOURCE_ID, run_travelpayouts_search
+from domain.reliability.circuit_breaker import CircuitState
 from domain.users.passwords import hash_password
 from infrastructure.postgres.database import session_scope
 from infrastructure.postgres.models import Role, User
+from infrastructure.postgres.models_health import SourceHealth
 from infrastructure.postgres.models_reference import Airport, TimezoneResolution
 from infrastructure.postgres.models_search import CashObservation, Search, SearchState
+from infrastructure.postgres.source_health import record_failure, record_success
+from providers.errors import SourceErrorKind
 
 FIXTURE_BODY = {
     "success": True,
@@ -176,5 +180,53 @@ async def test_job_fails_search_cleanly_when_origin_timezone_unresolved(monkeypa
         search = await db.get(Search, search_id)
         assert search.state == SearchState.FAILED
         assert search.failure_reason == "not_available"
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.integration
+async def test_job_rejects_fast_when_circuit_is_open(monkeypatch) -> None:
+    """The shared per-process "travelpayouts" circuit is forced open before
+    running the job, and reset afterward — this table has no per-test
+    isolation (single row per source), so leaving it open would make later
+    tests order-dependent."""
+    monkeypatch.setenv("TRAVELPAYOUTS_TOKEN", "test-token")
+    from infrastructure.settings import get_settings
+
+    get_settings.cache_clear()
+
+    await _seed_airport("MXU")
+    search_id = await _seed_user_and_search("MXU", "NRT")
+
+    # Drive the circuit open through the real public API (three
+    # circuit-relevant failures, matching FAILURE_THRESHOLD) rather than
+    # fabricating a SourceHealth row directly — a hand-built row risks a
+    # duplicate-key conflict with whatever record_success/record_failure
+    # calls other tests already made against this same shared "travelpayouts"
+    # row, and exercises less of the real path besides.
+    async with session_scope() as db:
+        for _ in range(3):
+            await record_failure(db, SOURCE_ID, SourceErrorKind.UPSTREAM_ERROR)
+        health = await db.get(SourceHealth, SOURCE_ID)
+        assert health.state == CircuitState.OPEN.value  # sanity check on the setup itself
+
+    fetch_called = False
+
+    async def _fetch_should_not_be_called(request, token):
+        nonlocal fetch_called
+        fetch_called = True
+        return FIXTURE_BODY
+
+    try:
+        await run_travelpayouts_search({}, str(search_id), _fetch=_fetch_should_not_be_called)
+
+        assert fetch_called is False
+        async with session_scope() as db:
+            search = await db.get(Search, search_id)
+            assert search.state == SearchState.FAILED
+            assert search.failure_reason == "blocked"
+    finally:
+        async with session_scope() as db:
+            await record_success(db, SOURCE_ID)  # leave the shared circuit closed
 
     get_settings.cache_clear()

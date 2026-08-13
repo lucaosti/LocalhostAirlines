@@ -1,7 +1,7 @@
 """rewrite cash_observations to spec 56 shape
 
 Revision ID: 3f8c10c6e28a
-Revises: 5c44068e84aa
+Revises: 70d85219ea17
 Create Date: 2026-08-13 20:09:32.533061
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "3f8c10c6e28a"
-down_revision: str | None = "5c44068e84aa"
+down_revision: str | None = "70d85219ea17"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

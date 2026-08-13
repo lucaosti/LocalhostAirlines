@@ -13,6 +13,7 @@ from arq.cron import cron
 
 from apps.worker.jobs.daily_aggregates import compute_flight_price_daily
 from apps.worker.jobs.fx_rates import ingest_fx_rates
+from apps.worker.jobs.maintain_partitions import run_partition_maintenance
 from apps.worker.jobs.reference_data import ingest_reference_data
 from apps.worker.jobs.scheduled_collection import run_scheduled_collection
 from apps.worker.jobs.travelpayouts_search import run_travelpayouts_search
@@ -76,6 +77,7 @@ class WorkerSettings:
         ingest_fx_rates,
         run_travelpayouts_search,
         run_scheduled_collection,
+        run_partition_maintenance,
         compute_flight_price_daily,
     ]
     cron_jobs: list[Any] = [
@@ -93,6 +95,11 @@ class WorkerSettings:
         # cron that actually starts it. Once daily, well clear of the FX and
         # reference-data jobs above.
         cron(run_scheduled_collection, hour=6, minute=0),
+        # Monthly is enough for a 3-month rolling window (module docstring,
+        # apps/worker/jobs/maintain_partitions.py) — first of the month, ahead
+        # of every other job below so a fresh month's partition exists before
+        # anything tries to write into it.
+        cron(run_partition_maintenance, day=1, hour=1, minute=0),
         # Ahead of the collection run above, over the day's settled data —
         # a full recompute (module docstring, apps/worker/jobs/daily_aggregates.py)
         # so it doesn't need to race collection finishing.

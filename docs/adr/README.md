@@ -17,6 +17,7 @@ same pull request.
 | [0004](0004-vite-spa-over-nextjs.md) | Vite SPA instead of Next.js | Accepted |
 | [0005](0005-collection-before-evaluation.md) | Historical collection precedes historical evaluation | Accepted |
 | [0006](0006-score-bands.md) | Bands and breakdown instead of a numeric score | Accepted |
+| [0007](0007-observation-volume-estimate.md) | Observation volume estimate and default query budget | Accepted |
 
 ## Format
 

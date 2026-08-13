@@ -1322,6 +1322,9 @@ Carried deliberately, to be resolved by time-boxed `type:spike` issues:
 1. Which airlines expose usable unprotected endpoints, and with what coverage.
 2. Whether Google Flights access is stable enough at low volume to be worth its maintenance.
 3. Which award sources are reachable without account automation, and at what quality.
-4. Whether Wikipedia's visa tables are structured consistently enough for reliable parsing
-   across all destinations, or only for a subset.
+4. ~~Whether Wikipedia's visa tables are structured consistently enough for reliable parsing
+   across all destinations, or only for a subset.~~ Resolved: yes, one generic parser
+   suffices — table shape is consistent across sampled major, mid-size and micro-state
+   passport pages; what varies is cell completeness, already handled by the existing
+   `UNKNOWN`-over-guess rule (`docs/providers.md` "Visa requirements" § Parsing, issue #5).
 5. Realistic observation volume per day, and therefore actual storage growth.

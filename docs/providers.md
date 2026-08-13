@@ -28,7 +28,7 @@ corrected in place as reality is discovered.
 | [Google Flights](#google-flights) | `UNOFFICIAL_ENDPOINT` | Cash, broad coverage | Free | Spike required |
 | [Amex Italy partners](#amex-italy-transfer-partners) | `SCRAPED` | Transfer rules | Free | Planned, M5 |
 | [Visa requirements](#visa-requirements) | `SCRAPED` | Entry requirements | Free | Planned, M7 |
-| [Award availability](#award-availability) | `SCRAPED` | Award space | Free | Spike required, M6 |
+| [Award availability](#award-availability) | `SCRAPED` | Award space | Free | Rejected — manual entry only (issue #4), M6 |
 | [Deferred sources](#deferred-sources) | — | Not adopted | Paid or gated | Documented for reference |
 
 ---
@@ -407,7 +407,7 @@ itinerary is evaluated against an uncached country pair.
 
 ## Award availability
 
-**Class** `SCRAPED` · **Cost** free · **Verification** `UNVERIFIED` — spike required · **Milestone** M6
+**Class** `SCRAPED` · **Cost** free · **Verification** spike complete — **no qualifying source, manual entry only** (issue #4) · **Milestone** M6
 
 The hardest category, and the one where the zero-budget constraint costs most.
 
@@ -427,13 +427,30 @@ If the zero-budget constraint is ever relaxed, seats.aero is the single highest-
 purchase available to this project, and the adapter should be written against its documented
 API rather than against anything else.
 
-### What remains
+### What remains — resolved: nothing qualifies
 
-Award-space sources that are publicly readable without authentication. What qualifies must be
-established by spike before M6 — this section is currently a statement of intent, not of
-capability.
+The one open question was whether any airline's award search is genuinely guest-accessible
+(no login) *and* free of a scraping prohibition — narrower than "excluded" above, which only
+covered the sessions/bot-protection case. Checked against the pattern across major US
+carriers (issue #4):
 
-### Consequence if nothing qualifies
+- **American Airlines** — guest-accessible, but its terms of use explicitly prohibit
+  automated access, screen scraping and bots, with real litigation history (a court order
+  against a scraper of aa.com). Same posture as Ryanair (issue #2): a ToS prohibition alone
+  is a clean reject, regardless of technical reachability.
+- **United and Air Canada** — both *removed* guest award search specifically to block
+  aggregators like seats.aero (United: "first among the big US airlines" to do so; Air
+  Canada followed in March 2025). This is the strongest signal in the entire check: the
+  industry is actively closing this exact loophole, not leaving it open by oversight.
+- **Southwest** — also has real scraping-litigation history against it, per the same
+  research pass.
+
+No airline award search page — guest-accessible or not — clears both bars (open access and
+no prohibition) at once, and the trend is toward fewer being even guest-accessible at all.
+This is not a coverage gap to revisit opportunistically; it is a stable industry posture this
+project has no reason to expect will reverse.
+
+### Consequence — realized, not hypothetical
 
 The award engine, transfer calculation and reverse search from a points balance are all built
 regardless: they are pure domain logic, fully unit-testable against fixtures, and they are a

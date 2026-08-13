@@ -403,7 +403,7 @@ Detailed contracts for each are in `docs/providers.md`. Summary:
 | Google Flights | `UNOFFICIAL_ENDPOINT` | Broad cash coverage, closer to live |
 | Amex Italy partners page | `SCRAPED` | Transfer ratios, minimums, increments, times |
 | Wikipedia + Farnesina | `SCRAPED` | Visa and entry requirements by passport |
-| Award sources | `SCRAPED` | Award availability and pricing |
+| ~~Award sources~~ | `SCRAPED` | Rejected — no qualifying source; manual entry only (issue #4) |
 
 Travelpayouts returns cached rather than live prices. That is acceptable and even
 well-matched to the primary purpose: building the historical record (P5) needs breadth and
@@ -1326,7 +1326,13 @@ Carried deliberately, to be resolved by time-boxed `type:spike` issues:
    standard automated access at the edge before reachability could even be assessed. No
    adapter is built in this category (`docs/providers.md` "Airline open endpoints", issue #2).
 2. Whether Google Flights access is stable enough at low volume to be worth its maintenance.
-3. Which award sources are reachable without account automation, and at what quality.
+3. ~~Which award sources are reachable without account automation, and at what quality.~~
+   Resolved: none qualify. Guest-accessible airline award search either carries an explicit
+   scraping prohibition with real enforcement history (American Airlines, matching Ryanair's
+   pattern in item 1) or has been actively closed specifically to block aggregators (United,
+   Air Canada) — an industry-wide posture, not a gap expected to reverse. The award engine is
+   built regardless, operating on manually entered observations (`docs/providers.md` "Award
+   availability", issue #4).
 4. ~~Whether Wikipedia's visa tables are structured consistently enough for reliable parsing
    across all destinations, or only for a subset.~~ Resolved: yes, one generic parser
    suffices — table shape is consistent across sampled major, mid-size and micro-state

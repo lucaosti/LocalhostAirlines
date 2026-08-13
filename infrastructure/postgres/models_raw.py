@@ -10,9 +10,17 @@ Source-agnostic shape (not Travelpayouts-specific) so #14/#15's adapters can
 adopt the same table later without a schema change, even though issue #52
 only wires up Travelpayouts for now.
 
-Retention (12 months, spec §55) is enforced by a scheduled job dropping old
-rows/partitions (issue #53), not implemented in this module — this is
-storage and retrieval only.
+Retention (12 months, spec §55) is enforced by
+infrastructure/postgres/partitions.py dropping whole old partitions, not row
+by row — O(1), no table bloat, no vacuum pressure, per spec §55's own
+stated reasoning.
+
+Issue #53: declaratively partitioned by month on `retrieved_at`. The
+primary key is the composite `(id, retrieved_at)`, not `id` alone —
+Postgres requires the partition column on every unique constraint of a
+partitioned table. `retrieved_at` is set once at insert and never updated
+(this table has no update path at all — see store_raw_payload), so this
+does not mean a row moves partitions during its life.
 """
 
 from __future__ import annotations
@@ -29,6 +37,7 @@ from infrastructure.postgres.base import Base
 
 class RawPayload(Base):
     __tablename__ = "raw_payloads"
+    __table_args__ = ({"postgresql_partition_by": "RANGE (retrieved_at)"},)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
 
@@ -41,4 +50,4 @@ class RawPayload(Base):
     content_encoding: Mapped[str] = mapped_column(String(16), default="gzip")
     payload: Mapped[bytes] = mapped_column(LargeBinary)
 
-    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)

@@ -26,6 +26,16 @@ provenance/debugging only; it carries no identity meaning.
 can query "this route's current observations" directly — matching the
 dimensions spec §57's `flight_price_daily` aggregate will need anyway,
 rather than reaching through a `Search` join that no longer has 1:1 meaning.
+
+Issue #53: `cash_observations` is declaratively partitioned by month on
+`first_seen_at` (spec §55). Postgres requires every unique/primary key on a
+partitioned table to include the partition column, so the primary key is
+the composite `(id, first_seen_at)` rather than `id` alone —
+`first_seen_at` is never written again after insert (write_observation's
+"extend" path only ever updates `last_seen_at`/`poll_count`/detail fields),
+so a row never needs to move partitions. Partitions themselves are runtime
+objects created by infrastructure/postgres/partitions.py's maintenance job,
+not represented in migrations (spec §55's own stated split).
 """
 
 from __future__ import annotations
@@ -76,6 +86,7 @@ class Search(Base):
 
 class CashObservation(Base):
     __tablename__ = "cash_observations"
+    __table_args__ = ({"postgresql_partition_by": "RANGE (first_seen_at)"},)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
 
@@ -107,7 +118,12 @@ class CashObservation(Base):
     # poll. An unchanged repeat poll extends last_seen_at and increments
     # poll_count instead of writing a new row (issue #54,
     # domain/collection/material_change.py).
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    #
+    # Part of the primary key (issue #53) — Postgres requires the partition
+    # column on every unique constraint of a partitioned table. Never
+    # rewritten after insert, so this does not mean a row can move
+    # partitions during its life.
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     poll_count: Mapped[int] = mapped_column(Integer, default=1)
 

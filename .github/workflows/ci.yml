@@ -152,8 +152,18 @@ jobs:
           for f in "${!targets[@]}"; do
             if [ -f "$f" ]; then
               found=true
-              echo "::group::Building $f (context: ${targets[$f]})"
-              docker buildx build --platform linux/amd64,linux/arm64 -f "$f" "${targets[$f]}"
+              # GitHub Actions cache backend, scoped per Dockerfile so five
+              # images don't thrash a single shared cache. Without this, every
+              # PR rebuilt everything from scratch — Chromium included —
+              # regardless of whether the Dockerfile itself changed; confirmed
+              # on PR #32, where only Caddy/health.py changed yet the job
+              # still took the full ~12 minutes.
+              scope=$(echo "$f" | tr '/' '-')
+              echo "::group::Building $f (context: ${targets[$f]}, cache scope: $scope)"
+              docker buildx build --platform linux/amd64,linux/arm64 \
+                --cache-from "type=gha,scope=$scope" \
+                --cache-to "type=gha,mode=max,scope=$scope" \
+                -f "$f" "${targets[$f]}"
               echo "::endgroup::"
             fi
           done

@@ -77,9 +77,15 @@ jobs:
       # needing to be turned on later.
       - name: Contract tests (fixtures only)
         run: |
-          pytest -v -m contract; code=$?
+          # GitHub Actions runs bash steps with `set -e`, which would abort the
+          # script on pytest's non-zero exit before `code=$?` ever ran. Disable
+          # it for exactly this one command.
+          set +e
+          pytest -v -m contract
+          code=$?
+          set -e
           if [ "$code" -eq 5 ]; then
-            echo "No contract tests yet — expected before M1."
+            echo "No contract tests yet - expected before M1."
             exit 0
           fi
           exit "$code"
@@ -109,7 +115,12 @@ jobs:
         working-directory: apps/web
         run: npx tsc --noEmit
       - if: steps.detect.outputs.present == 'false'
-        run: echo "apps/web does not exist yet (lands in issue #11) — nothing to check."
+        # A plain single-line YAML scalar treats " #" mid-string as a comment
+        # start and truncates here — this bit us for real on the first CI run,
+        # which is why every run: value with a literal "#" in this file uses
+        # a block scalar instead.
+        run: |
+          echo "apps/web does not exist yet (lands in issue #11) - nothing to check."
 
   docker-build:
     runs-on: ubuntu-latest

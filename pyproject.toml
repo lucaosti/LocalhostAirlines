@@ -36,6 +36,10 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N"]
+ignore = [
+    "B008",  # Depends(...) as a default is the documented FastAPI pattern, not a bug
+    "N818",  # our exceptions are named *Problem to match RFC 9457 / docs/api.md §4 vocabulary
+]
 
 [tool.mypy]
 python_version = "3.13"

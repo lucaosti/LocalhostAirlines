@@ -24,7 +24,7 @@ corrected in place as reality is discovered.
 | [OurAirports](#ourairports) | `PUBLIC_DATA` | Airport reference | Free | Planned, M0 |
 | [OpenFlights](#openflights) | `PUBLIC_DATA` | Airline reference | Free | Planned, M0 |
 | [ECB reference rates](#ecb-reference-rates) | `PUBLIC_DATA` | FX conversion | Free | Planned, M0 |
-| [Airline open endpoints](#airline-open-endpoints) | `UNOFFICIAL_ENDPOINT` | Cash, live | Free | Spike required |
+| [Airline open endpoints](#airline-open-endpoints) | `UNOFFICIAL_ENDPOINT` | Cash, live | Free | Rejected — no adapter (issue #2) |
 | [Google Flights](#google-flights) | `UNOFFICIAL_ENDPOINT` | Cash, broad coverage | Free | Spike required |
 | [Amex Italy partners](#amex-italy-transfer-partners) | `SCRAPED` | Transfer rules | Free | Planned, M5 |
 | [Visa requirements](#visa-requirements) | `SCRAPED` | Entry requirements | Free | Planned, M7 |
@@ -214,31 +214,54 @@ date is recorded, so the gap is visible rather than hidden.
 
 ## Airline open endpoints
 
-**Class** `UNOFFICIAL_ENDPOINT` · **Cost** free · **Verification** `UNVERIFIED` — spike required
+**Class** `UNOFFICIAL_ENDPOINT` · **Cost** free · **Verification** spike complete — **rejected, no adapter** (issue #2)
 
 Several carriers expose unauthenticated JSON endpoints consumed by their own web frontends.
 Where these exist they are the highest-quality free live data available: structured, fast, and
-without the fragility of HTML parsing.
+without the fragility of HTML parsing. Coverage skews strongly toward low-cost carriers, which
+limits usefulness for the long-haul premium cabins this project cares most about — and, as
+the spike below found, that ceiling turns out not to matter, because neither of the two
+carriers this document previously named as candidates clears the ToS bar regardless of
+coverage.
 
-Ryanair is the widely known case; Wizz Air exposes some functionality similarly. Coverage
-skews strongly toward low-cost carriers, which limits usefulness for the long-haul premium
-cabins this project cares most about.
+### Required spike — resolved, both candidates rejected
 
-### Required spike
+**Ryanair** — rejected on terms of use (criterion 4). Ryanair's own Terms of Use explicitly
+prohibit automated data extraction, name APIs specifically, and are not limited to a
+"commercial use" carve-out for the broader automation clause:
 
-Before any adapter is written, a `type:spike` issue must establish, per carrier: whether an
-endpoint exists and is reachable without authentication; what it returns; what rate limiting
-or blocking it applies; whether its terms of use prohibit programmatic access; and whether
-coverage justifies the maintenance.
+> "Use of any automated system or software ... to extract any data from this website for
+> commercial purposes ('screen scraping') is strictly prohibited," and separately, use of the
+> site — including "its underlying computer programs (including [APIs])" — is restricted to
+> "private, non-commercial purposes."
 
-The answer is recorded here, and a carrier is adopted only if the spike is positive on all
-five points.
+This is not a theoretical restriction: Ryanair has litigated and won on it (*Ryanair v PR
+Aviation*, CJEU; a further UK High Court injunction against a screen-scraper). A personal,
+non-commercial deployment plausibly falls inside "private, non-commercial purposes" for
+*browsing* the site, but the automated-extraction clause is not qualified the same way and
+Ryanair's litigation history shows it enforces against automation specifically, not only
+against commercial resale. Given `spec §19`'s own instruction to access sources politely and
+respect their terms, and this spike's own rule (adopt only if positive on **all** five
+points), this is a clean reject — checking the other four points would not change the
+outcome, so the spike stops here for this carrier.
+
+**Wizz Air** — rejected on reachability grounds (criterion 1/2). The site actively blocked a
+standard, honestly-identified HTTP fetch at the edge (`405 Method Not Allowed`) before any
+endpoint-specific probing was attempted, and its terms of use could not be retrieved through
+normal means for the same reason. This is itself the answer to "is it reachable without
+extra measures": no, not without impersonation techniques this project does not use (spec
+§19's requirement to identify honestly rules out disguising the client to get past this).
+Combined with Ryanair's outcome, coverage from this category would in any case be limited to
+carriers whose premium long-haul relevance is already low.
+
+**Verdict: no adapter is built in this category.** Both currently-known candidates fail a
+required criterion outright; no adapter, no fixture, no contract test. If a future carrier is
+found to expose an endpoint under genuinely permissive terms, it re-enters through a fresh
+spike rather than reopening this one.
 
 ### Handling
 
-Conservative rates, per-carrier limiter, per-carrier circuit breaker. These endpoints change
-without any notice whatsoever, so contract tests against fixtures are mandatory before the
-adapter is considered complete.
+Not applicable — no adapter exists in this category.
 
 ---
 
@@ -315,7 +338,7 @@ expected behaviour rather than an incident.
 
 ## Visa requirements
 
-**Class** `SCRAPED` · **Cost** free · **Verification** partially verified · **Tier** curated refresh
+**Class** `SCRAPED` · **Cost** free · **Verification** verified — table shape (issue #5); parser still unwritten · **Tier** curated refresh
 
 ### Sources
 
@@ -340,21 +363,40 @@ government ministry and an encyclopaedia.
 
 ### Parsing
 
-Wikipedia table structure is reasonably consistent but not uniform, and footnotes carry
-important conditions — validity requirements, fees, exemptions — which must be captured
-rather than discarded. A destination whose row cannot be parsed confidently yields `UNKNOWN`
-for that pair, never a guess.
+**Resolved by spike (issue #5, `spec §89` item 4).** Checked against `Category:Visa
+requirements by nationality` (~216 articles, essentially every UN member state plus a handful
+of disputed/special entities) and sampled across a major passport (Italian), a mid-size one
+with sparser coverage (Malagasy) and a micro-state (Tuvaluan). Verdict: **the table shape is
+consistent enough for one generic parser, with no per-country special-casing** — every page
+sampled used the same four columns, in the same order:
 
-Whether structure is consistent enough across all destinations, or only a subset, is an open
-question (`spec §89`) to be answered by spike.
+```
+Country/Region | Visa requirement | Allowed stay | Notes (excluding departure fees)
+```
+
+What varies is not structure but **cell completeness**: less-documented passports (Malagasy
+sampled) leave `Allowed stay` or `Notes` blank for some rows, where a major-passport page
+(Italian) fills them consistently. A blank or ambiguous cell yields `UNKNOWN` for that
+pair, never a guess — this was already the designed behaviour (`spec P3`) and the sparseness
+found here is exactly the case it exists for, not a surprise it needs to accommodate.
+
+Footnotes appear as inline superscript references resolving to cited prose (fees, validity
+requirements, exemptions) and must be captured, not discarded — confirmed present and in the
+same anchor-link form across all three sampled pages.
 
 ### Transit
 
-`spec §65` requires evaluating every transit point, not just the destination. Transit rules
-are frequently in a separate section or a separate article, and this is exactly where the
-data is thinnest. Where a transit requirement cannot be established, the itinerary's readiness
-is `UNKNOWN` — never silently `READY`. A one-stop itinerary that looks cheap because its
-transit visa was never checked is the specific failure this rule exists to prevent.
+`spec §65` requires evaluating every transit point, not just the destination. **Confirmed by
+the same spike:** none of the three sampled pages carries a separate transit-specific
+section or table — a dedicated `Transit without visa` article does not exist on English
+Wikipedia (returns 404) — so transit information, when present at all, is folded into a
+destination's own `Notes` cell and is frequently simply absent. This means transit readiness
+will resolve to `UNKNOWN` for a meaningful share of itineraries at launch — not a bug to fix,
+but the correct outcome of `spec §65`'s own rule: a one-stop itinerary that looks cheap
+because its transit visa was never checked is the specific failure that rule exists to
+prevent, and Wikipedia alone does not give enough evidence to clear it for most transit
+points. Viaggiare Sicuro is the fallback cross-reference; where both are silent on a transit
+point, the itinerary carries `UNKNOWN` transit readiness, exactly as designed.
 
 ### Schedule
 

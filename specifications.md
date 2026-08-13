@@ -399,7 +399,7 @@ Detailed contracts for each are in `docs/providers.md`. Summary:
 | OurAirports | `PUBLIC_DATA` | Airports, IATA/ICAO, coordinates, timezones |
 | OpenFlights | `PUBLIC_DATA` | Airlines, routes |
 | European Central Bank | `PUBLIC_DATA` | Daily FX reference rates |
-| Airline open endpoints | `UNOFFICIAL_ENDPOINT` | Live cash fares for carriers exposing unprotected JSON |
+| ~~Airline open endpoints~~ | `UNOFFICIAL_ENDPOINT` | Rejected — no candidate carrier clears ToS/reachability (issue #2) |
 | Google Flights | `UNOFFICIAL_ENDPOINT` | Broad cash coverage, closer to live |
 | Amex Italy partners page | `SCRAPED` | Transfer ratios, minimums, increments, times |
 | Wikipedia + Farnesina | `SCRAPED` | Visa and entry requirements by passport |
@@ -564,7 +564,8 @@ combination the system chose not to spend budget on is unknown, and the interfac
 (P3). Reporting it as empty would make the cheapest search look like the most thorough one.
 
 Persistent watches receive a recurring daily allocation and spend it across their space over
-time, so coverage accumulates rather than repeating the same probes.
+time, so coverage accumulates rather than repeating the same probes. Default allocation and
+the resulting volume estimate: `docs/adr/0007-observation-volume-estimate.md`.
 
 ## 29. Search state machine
 
@@ -1319,9 +1320,20 @@ design.
 
 Carried deliberately, to be resolved by time-boxed `type:spike` issues:
 
-1. Which airlines expose usable unprotected endpoints, and with what coverage.
+1. ~~Which airlines expose usable unprotected endpoints, and with what coverage.~~ Resolved:
+   neither candidate qualifies. Ryanair's terms of use explicitly prohibit automated
+   extraction, including via API, with real enforcement history; Wizz Air's site blocks
+   standard automated access at the edge before reachability could even be assessed. No
+   adapter is built in this category (`docs/providers.md` "Airline open endpoints", issue #2).
 2. Whether Google Flights access is stable enough at low volume to be worth its maintenance.
 3. Which award sources are reachable without account automation, and at what quality.
-4. Whether Wikipedia's visa tables are structured consistently enough for reliable parsing
-   across all destinations, or only for a subset.
-5. Realistic observation volume per day, and therefore actual storage growth.
+4. ~~Whether Wikipedia's visa tables are structured consistently enough for reliable parsing
+   across all destinations, or only for a subset.~~ Resolved: yes, one generic parser
+   suffices — table shape is consistent across sampled major, mid-size and micro-state
+   passport pages; what varies is cell completeness, already handled by the existing
+   `UNKNOWN`-over-guess rule (`docs/providers.md` "Visa requirements" § Parsing, issue #5).
+5. ~~Realistic observation volume per day, and therefore actual storage growth.~~ Resolved by
+   calculation: `docs/adr/0007-observation-volume-estimate.md` (issue #6). Flagged there for
+   re-verification against live Travelpayouts traffic once issue #22 has run for a week —
+   that follow-up does not reopen this question, since it revisits an accepted estimate rather
+   than an unanswered one.

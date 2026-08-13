@@ -1,0 +1,6 @@
+apps
+config
+domain
+infrastructure
+normalization
+providers

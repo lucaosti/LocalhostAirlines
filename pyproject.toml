@@ -33,6 +33,10 @@ include = ["apps*", "domain*", "infrastructure*", "providers*", "normalization*"
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# docs/ holds illustrative pseudocode inside prose, not real source — ruff's
+# markdown code-fence formatting would rewrap it as if it were, which fights
+# the deliberate line breaks chosen for readability there.
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "N"]
@@ -59,4 +63,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "integration: requires a live PostgreSQL reachable at DATABASE_URL",
+    "contract: adapter contract test against a recorded fixture; never touches a real source (spec §21)",
 ]

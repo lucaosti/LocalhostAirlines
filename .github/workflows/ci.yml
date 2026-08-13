@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+
+# No job in this workflow reaches an external source (CLAUDE.md §6, "Continuous
+# integration"). Postgres and Redis below are service containers local to the
+# runner, not external dependencies — contract tests run against recorded
+# fixtures only, never a real provider.
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      # domain/ is held to a stricter bar by the mypy override in pyproject.toml
+      # (spec §5: the pure layer, no I/O, no framework imports).
+      - run: mypy domain infrastructure apps providers normalization
+
+  python-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: lha
+          POSTGRES_PASSWORD: lha
+          POSTGRES_DB: lha
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lha"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://lha:lha@localhost:5432/lha
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: ci-only-secret-key-not-for-production-use-0000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e '.[dev]'
+
+      # This *is* the migration round-trip acceptance criterion: the test runs
+      # upgrade -> downgrade -> upgrade -> downgrade -> upgrade against the
+      # service container above, not a single one-way `alembic upgrade head`.
+      - run: pytest -v -m "not contract"
+
+      # Adapter contract tests run against recorded fixtures under tests/fixtures
+      # (spec §21) and don't exist until the first adapter lands in M1. Tolerate
+      # pytest's exit code 5 ("no tests collected") so this step starts failing
+      # for real the moment a contract test is added and breaks, rather than
+      # needing to be turned on later.
+      - name: Contract tests (fixtures only)
+        run: |
+          # GitHub Actions runs bash steps with `set -e`, which would abort the
+          # script on pytest's non-zero exit before `code=$?` ever ran. Disable
+          # it for exactly this one command.
+          set +e
+          pytest -v -m contract
+          code=$?
+          set -e
+          if [ "$code" -eq 5 ]; then
+            echo "No contract tests yet - expected before M1."
+            exit 0
+          fi
+          exit "$code"
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check whether the frontend exists yet
+        id: detect
+        run: |
+          if [ -f apps/web/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - if: steps.detect.outputs.present == 'true'
+        working-directory: apps/web
+        run: npm ci
+      - if: steps.detect.outputs.present == 'true'
+        working-directory: apps/web
+        run: npx tsc --noEmit
+      - if: steps.detect.outputs.present == 'false'
+        # A plain single-line YAML scalar treats " #" mid-string as a comment
+        # start and truncates here — this bit us for real on the first CI run,
+        # which is why every run: value with a literal "#" in this file uses
+        # a block scalar instead.
+        run: |
+          echo "apps/web does not exist yet (lands in issue #11) - nothing to check."
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build every Dockerfile for linux/amd64 and linux/arm64
+        run: |
+          shopt -s nullglob
+          dockerfiles=(apps/*/Dockerfile infrastructure/*/Dockerfile)
+          if [ ${#dockerfiles[@]} -eq 0 ]; then
+            echo "No Dockerfiles yet (land in issue #7) — nothing to build."
+            exit 0
+          fi
+          for f in "${dockerfiles[@]}"; do
+            dir=$(dirname "$f")
+            echo "::group::Building $f"
+            docker buildx build --platform linux/amd64,linux/arm64 -f "$f" "$dir"
+            echo "::endgroup::"
+          done

@@ -13,9 +13,7 @@ import pytest
 
 
 def run_alembic(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["alembic", *args], capture_output=True, text=True, check=False, cwd="."
-    )
+    return subprocess.run(["alembic", *args], capture_output=True, text=True, check=False, cwd=".")
 
 
 @pytest.mark.integration

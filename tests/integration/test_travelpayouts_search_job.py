@@ -124,7 +124,7 @@ async def test_job_normalizes_and_persists_nonstop_only(monkeypatch) -> None:
         rows = (
             (
                 await db.execute(
-                    select(CashObservation).where(CashObservation.search_id == search_id)
+                    select(CashObservation).where(CashObservation.last_search_id == search_id)
                 )
             )
             .scalars()
@@ -133,6 +133,8 @@ async def test_job_normalizes_and_persists_nonstop_only(monkeypatch) -> None:
         # Only the transfers=0 entry normalizes (see normalization/travelpayouts.py).
         assert len(rows) == 1
         assert rows[0].price_minor == 61200
+        assert rows[0].poll_count == 1
+        assert rows[0].first_seen_at == rows[0].last_seen_at  # first poll: one period so far
         # The fixture's payload states "MXP" regardless of the requested
         # origin ("MXQ") — normalization reads what the source said, not
         # what was asked for, so "MXP" here is correct, not a typo.

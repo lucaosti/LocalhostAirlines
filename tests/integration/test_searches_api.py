@@ -6,6 +6,8 @@ the API's own persistence and auth behaviour, not job execution (covered
 separately by tests/integration/test_travelpayouts_search_job.py).
 """
 
+import random
+import string
 import uuid
 from datetime import UTC, datetime
 
@@ -121,9 +123,15 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await _create_user_and_login(client, "search-api-results")
+            # Results are now queried by route, not by search_id (issue
+            # #54) — a route unique to this test avoids picking up other
+            # tests' observations for the common MXP-NRT fixture route.
+            # Letters only: the API's IATA validator rejects digits, which
+            # a hex-derived code would sometimes contain.
+            origin = "Z" + "".join(random.choices(string.ascii_uppercase, k=2))
             created = await client.post(
                 "/api/v1/searches",
-                json={"origin": "MXP", "destination": "NRT", "depart_month": "2026-10"},
+                json={"origin": origin, "destination": "NRT", "depart_month": "2026-10"},
             )
             search_id = created.json()["id"]
 
@@ -132,17 +140,23 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
             async with session_scope() as db:
                 search = await db.get(Search, uuid.UUID(search_id))
                 search.state = SearchState.READY
+                now = datetime.now(UTC)
                 db.add(
                     CashObservation(
                         id=uuid.uuid4(),
-                        search_id=search.id,
+                        last_search_id=search.id,
                         itinerary_id="deadbeef",
                         source="travelpayouts",
+                        origin=search.origin,
+                        destination=search.destination,
+                        depart_month=search.depart_month,
                         price_minor=61200,
                         currency="EUR",
                         freshness="cached",
                         confidence="high",
-                        retrieved_at=datetime.now(UTC),
+                        first_seen_at=now,
+                        last_seen_at=now,
+                        poll_count=1,
                         offer={
                             "offer_id": "travelpayouts:MXP-NRT:2026-10-01",
                             "itinerary_id": "deadbeef",

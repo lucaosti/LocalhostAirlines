@@ -1,13 +1,12 @@
 """Runs one M1 walking-skeleton search: fetch -> retain raw -> normalize ->
-persist (issues #43, #52, #56).
+persist (issues #43, #52, #54, #56).
 
 fetch (providers.travelpayouts.client, issue #41), guarded by a per-source
 circuit breaker (issue #56, spec §21/§25 — repeated source-side failures
 stop further calls rather than retrying harder) -> raw retention (issue
 #52, spec §4/§55) -> normalize (normalization.travelpayouts, issue #42) ->
-quality gate -> write (spec §56's write order, applied here in its thinnest
-possible form — no material-change dedup or partitioning yet, that is spec
-§56's full M2 design, issues #53/#54).
+quality gate -> write with material-change dedup (spec §56's real write
+order, issue #54). No partitioning yet — that is issue #53.
 """
 
 from __future__ import annotations
@@ -20,10 +19,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domain.flight.serialization import offer_to_dict
 from infrastructure.postgres.database import session_scope
 from infrastructure.postgres.models_reference import Airport
-from infrastructure.postgres.models_search import CashObservation, Search, SearchState
+from infrastructure.postgres.models_search import Search, SearchState
+from infrastructure.postgres.observations import write_observation
 from infrastructure.postgres.raw_payloads import store_raw_payload
 from infrastructure.postgres.source_health import may_call, record_failure, record_success
 from infrastructure.settings import get_settings
@@ -70,19 +69,19 @@ async def run_travelpayouts_search(
         search = await _get_search(db, search_id)
         now = datetime.now(UTC)
         for offer in offers:
-            db.add(
-                CashObservation(
-                    id=uuid.uuid4(),
-                    search_id=search.id,
-                    itinerary_id=offer.itinerary_id,
-                    source=offer.source,
-                    price_minor=offer.price_minor,
-                    currency=offer.currency,
-                    freshness=offer.freshness.value,
-                    confidence=offer.confidence.value,
-                    offer=offer_to_dict(offer),
-                    retrieved_at=offer.retrieved_at,
-                )
+            # Material-change dedup (spec §56, issue #54): extends the
+            # existing period for this itinerary+source if the price is
+            # unchanged, rather than writing a new row per poll — required
+            # for percentile correctness once a scheduled re-collection
+            # (issue #56) polls the same route daily.
+            await write_observation(
+                db,
+                offer=offer,
+                origin=search.origin,
+                destination=search.destination,
+                depart_month=search.depart_month,
+                retrieved_at=offer.retrieved_at,
+                search_id=search.id,
             )
         search.state = SearchState.READY
         search.completed_at = now

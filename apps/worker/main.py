@@ -13,6 +13,7 @@ from arq.cron import cron
 
 from apps.worker.jobs.fx_rates import ingest_fx_rates
 from apps.worker.jobs.reference_data import ingest_reference_data
+from apps.worker.jobs.travelpayouts_search import run_travelpayouts_search
 from infrastructure.logging import configure_logging
 from infrastructure.settings import get_settings
 
@@ -45,7 +46,11 @@ class WorkerSettings:
     # Both registered as functions too, not only cron jobs, so either can be
     # triggered on demand later (e.g. an admin "refresh now" endpoint)
     # without duplicating the ingestion logic.
-    functions: list[Any] = [ingest_reference_data, ingest_fx_rates]
+    # run_travelpayouts_search has no cron entry: it runs only on an
+    # explicit user search request (spec §29), never on a schedule — CLAUDE.md
+    # §6's "no user request ever blocks on a browser" applies here too, just
+    # via an API-triggered enqueue rather than a scheduled one.
+    functions: list[Any] = [ingest_reference_data, ingest_fx_rates, run_travelpayouts_search]
     cron_jobs: list[Any] = [
         cron(heartbeat, minute=set(range(0, 60, 5))),
         # Monthly, matching docs/providers.md's stated refresh cadence for

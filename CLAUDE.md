@@ -221,9 +221,15 @@ the change under review, and would train everyone to ignore red builds.
 
 ### Docker is the only runtime
 
-Nothing is installed on the host — no Python, no Node, no package managers. Development and
-production both run through Compose, differing only by profile: development bind-mounts
-source and enables hot reload for `api` and the Vite dev server.
+Nothing is installed on the host — no Python, no Node, no package managers. Production is
+`docker-compose.yml` alone (`make up`). Development additionally loads `docker-compose.dev.yml`
+plus `--profile dev` (`make dev`), which bind-mounts source and enables hot reload for `api` and
+the Vite dev server. The dev file is deliberately not named `docker-compose.override.yml`:
+that filename auto-merges into every `docker compose` invocation, which would make a bare
+`docker compose up -d` on a production host silently pick up dev behaviour whenever the file
+happened to be present. It also tags the dev builds under a distinct image name — reusing the
+production tag let Compose skip rebuilding on `up` and silently serve the production binary
+under a "dev" invocation, caught the first time the setup was actually run end to end.
 
 Images are built for `linux/amd64` and `linux/arm64` so the same images run on an Apple
 Silicon development machine and on an x86 production host. All state lives in named volumes.

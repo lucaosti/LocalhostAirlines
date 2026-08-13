@@ -14,7 +14,15 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ARRAY, CheckConstraint, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    ARRAY,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -150,4 +158,5 @@ class TravellerRelationship(Base):
 
     __table_args__ = (
         CheckConstraint("traveller_id != companion_id", name="companion_is_not_self"),
+        UniqueConstraint("traveller_id", "companion_id", name="uq_traveller_companion_pair"),
     )

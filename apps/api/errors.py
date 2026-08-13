@@ -8,6 +8,7 @@ never has to special-case which layer produced the failure.
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -117,12 +118,19 @@ def register_error_handlers(app: FastAPI) -> None:
         # FastAPI's own body/query parsing failures are semantically invalid
         # requests (spec 422), not malformed ones (400) — the request was
         # well-formed JSON that failed our schema.
+        # Pydantic v2 puts the raised exception object itself in each error's
+        # `ctx` when a `field_validator` raises `ValueError` (e.g.
+        # travellers.py's passport_codes_are_alpha2), which plain
+        # json.dumps cannot serialize. jsonable_encoder converts it (and
+        # anything else non-primitive) to a JSON-safe form first — this was
+        # unreachable until issue #43's own validators started raising with
+        # a message, which is what surfaced it here.
         problem = {
             "type": f"{PROBLEM_BASE}/unprocessable",
             "title": "Semantically invalid request",
             "status": status.HTTP_422_UNPROCESSABLE_CONTENT,
             "instance": str(request.url.path),
-            "errors": exc.errors(),
+            "errors": jsonable_encoder(exc.errors()),
         }
         return _json_problem(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
 

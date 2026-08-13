@@ -1,9 +1,7 @@
 """ARQ worker: scheduled jobs, cron schedules, Telegram polling (CLAUDE.md §6).
 
-Empty function and cron lists are correct for M0 — the scheduler and Telegram
-bot are asyncio loops added here as their own issues land (#14, #15, and the
-M8 Telegram work). An ARQ worker with no jobs registered still runs, connects
-to Redis, and is a real, checkable deployment target rather than a stub.
+Reference data ingestion (#14) is the first real scheduled job here; #15 and
+the M8 Telegram work land alongside it the same way.
 """
 
 import logging
@@ -12,6 +10,7 @@ from typing import Any
 from arq.connections import RedisSettings
 from arq.cron import cron
 
+from apps.worker.jobs.reference_data import ingest_reference_data
 from infrastructure.logging import configure_logging
 from infrastructure.settings import get_settings
 
@@ -41,8 +40,16 @@ class WorkerSettings:
     builds the actual Worker instance — not instantiated directly here.
     """
 
-    functions: list[Any] = []
-    cron_jobs: list[Any] = [cron(heartbeat, minute=set(range(0, 60, 5)))]
+    # Registered as a function too, not only a cron job, so it can be
+    # triggered on demand later (e.g. an admin "refresh now" endpoint)
+    # without duplicating the ingestion logic.
+    functions: list[Any] = [ingest_reference_data]
+    cron_jobs: list[Any] = [
+        cron(heartbeat, minute=set(range(0, 60, 5))),
+        # Monthly, matching docs/providers.md's stated refresh cadence for
+        # OurAirports and OpenFlights — both change slowly.
+        cron(ingest_reference_data, day=1, hour=3, minute=0),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

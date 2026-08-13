@@ -65,6 +65,20 @@ disallow_any_generics = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# pytest-asyncio's default is a fresh event loop per test function, but the
+# lru_cache-memoized engine/redis singletons (infrastructure/postgres/database.py,
+# infrastructure/redis.py) are created once and bound to whichever loop was
+# running the first time they were used — matching how the real app runs
+# (one process, one loop). A per-test loop breaks that on the second test:
+# "Event loop is closed" the moment a cached connection from test A is reused
+# in test B's different loop. Scoping to "session" gives every test the same
+# loop, matching production instead of fighting it.
+asyncio_default_test_loop_scope = "session"
+# Fixtures default to function-scoped loops independently of the test loop
+# scope above — same mismatch, different knob. An autouse fixture using the
+# same cached redis client hit "Event loop is closed" in its teardown until
+# this was set too.
+asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tests"]
 markers = [
     "integration: requires a live PostgreSQL reachable at DATABASE_URL",

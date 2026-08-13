@@ -42,8 +42,14 @@ history and aggregate structures.
 
 ## 2. Authentication
 
-Session-based, using an httpOnly, `SameSite=Strict`, secure cookie backed by Redis. No
-bearer tokens, no client-side token storage, no hand-rolled JWT (`spec §78`).
+Session-based, using an httpOnly, `SameSite=Strict` cookie whose state lives in PostgreSQL,
+not Redis — a Redis restart must not log every user out (`spec §78`, `§82`). No bearer tokens,
+no client-side token storage, no hand-rolled JWT.
+
+The cookie's `Secure` attribute is **not** set unconditionally: the deployment target is plain
+HTTP on a trusted LAN (`spec §8`, `§157`), and a browser never sends a `Secure` cookie back over
+plain HTTP — setting it unconditionally would break login in the documented deployment. It is
+configurable (`COOKIE_SECURE`) for anyone terminating TLS in front of Caddy.
 
 ```http
 POST /api/v1/auth/login       { "username": ..., "password": ... }  → Set-Cookie

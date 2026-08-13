@@ -15,13 +15,11 @@ Runs on one machine on your LAN. No cloud, no subscriptions, no AI.
 
 ## Status
 
-**Design complete. No code yet.**
+**M0 (foundations) in progress.** Docker Compose, CI, the database schema, and the API and SPA
+skeletons run for real. Domain features (search, loyalty, awards, travel requirements) start at
+M1 and don't exist yet — see [Roadmap](#roadmap).
 
-The specification is finished and the technical decisions are made and recorded. Implementation
-starts at M0. Nothing in this repository runs.
-
-This README describes what is being built, not what exists. Where it describes commands, those
-commands will work once M0 lands.
+This README describes commands that work today unless a section says otherwise.
 
 ---
 
@@ -133,9 +131,10 @@ as thorough as an exhaustive one.
 
 Six containers: `caddy`, `api`, `worker`, `scraper`, `postgres`, `redis`.
 
-**Nothing is installed on the host.** No Python, no Node, no package manager. Development and
-production differ only by Compose profile. Images build for `linux/amd64` and `linux/arm64`, so
-the same images run on an Apple Silicon laptop and an x86 server.
+**Nothing is installed on the host.** No Python, no Node, no package manager. `make up` runs
+production; `make dev` layers on hot reload and hands you the same six services plus a
+Vite dev server. Images build for `linux/amd64` and `linux/arm64`, so the same images run on an
+Apple Silicon laptop and an x86 server — verified, not assumed: Chromium included.
 
 Only PostgreSQL is a hard dependency. Lose Redis and the system goes read-only rather than
 down: sessions survive, history stays readable, jobs queue until it returns.
@@ -154,8 +153,6 @@ down: sessions survive, history stays readable, jobs queue until it returns.
 
 ## Running it
 
-Once M0 lands:
-
 ```bash
 git clone https://github.com/lucaosti/LocalhostAirlines.git
 cd LocalhostAirlines
@@ -165,22 +162,29 @@ cp .env.example .env
 Fill in `.env` — at minimum `POSTGRES_PASSWORD`, `SECRET_KEY` and `TRAVELPAYOUTS_TOKEN`. Then:
 
 ```bash
-docker compose up -d
+make up
 ```
 
-The interface is on `http://localhost` — or wherever you point Caddy on your LAN.
+The interface is on `http://localhost` — or wherever you point Caddy on your LAN. The `api`
+container migrates the database on its own startup before serving traffic.
 
 Development, with hot reload for both API and frontend:
 
 ```bash
-docker compose --profile dev up
+make dev
 ```
+
+This loads `docker-compose.dev.yml` on top of the base file and adds the Vite dev server
+(`http://localhost:5173`) alongside the six core services. It's a separate file rather than
+the Compose-auto-merged `docker-compose.override.yml` on purpose: that convention would make a
+bare `make up` on a production host silently run in dev mode too. See the file's header for the
+full reasoning.
 
 Back up nightly. The accumulated history is the whole point of the project and cannot be
 re-fetched retroactively:
 
 ```bash
-docker compose exec postgres pg_dump -U localhostairlines localhostairlines | gzip > backup.sql.gz
+BACKUP_TARGET=/path/to/backups make backup
 ```
 
 Restore it somewhere at least once. A backup you've never restored is a hypothesis.

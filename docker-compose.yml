@@ -1,0 +1,110 @@
+# Production topology: six always-on services (spec §6, CLAUDE.md §6).
+# `docker compose up -d` with no other flags starts exactly these, in their
+# production build target — this file alone is what a deployment runs.
+#
+# Local development additionally loads docker-compose.dev.yml (not
+# auto-merged; must be passed explicitly — see that file's header for why)
+# plus `--profile dev` for the Vite dev server, which has no production
+# equivalent: Caddy serves the static build directly in prod. `make dev`
+# wraps the full invocation.
+#
+# All versions pinned; `latest` appears nowhere (CLAUDE.md §6).
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scraper:
+    build:
+      context: .
+      dockerfile: apps/scraper/Dockerfile
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Headless Chromium is the reason this container is isolated from worker
+    # (spec §24) — a hard cap keeps a stuck scrape from starving the host.
+    mem_limit: 1g
+
+  caddy:
+    build:
+      context: .
+      dockerfile: infrastructure/caddy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Dev-only: the Vite dev server. No production equivalent (see header
+  # comment). `docker compose --profile dev up` starts this alongside the six
+  # services above; a bare `docker compose up -d` never does.
+  web:
+    profiles: ["dev"]
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

@@ -133,16 +133,30 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Build every Dockerfile for linux/amd64 and linux/arm64
+        # (context, dockerfile) pairs, kept in sync with docker-compose.yml's
+        # own build.context / build.dockerfile per service — api/worker/
+        # scraper/caddy build from the repo root because they copy domain/,
+        # infrastructure/, providers/ and normalization/ from outside their
+        # own directory; only web is self-contained. A plain per-file glob
+        # using dirname() as the context, tried first, built the wrong thing
+        # for everything except web and failed outright for api.
         run: |
-          shopt -s nullglob
-          dockerfiles=(apps/*/Dockerfile infrastructure/*/Dockerfile)
-          if [ ${#dockerfiles[@]} -eq 0 ]; then
-            echo "No Dockerfiles yet (land in issue #7) — nothing to build."
-            exit 0
-          fi
-          for f in "${dockerfiles[@]}"; do
-            dir=$(dirname "$f")
-            echo "::group::Building $f"
-            docker buildx build --platform linux/amd64,linux/arm64 -f "$f" "$dir"
-            echo "::endgroup::"
+          declare -A targets=(
+            ["apps/api/Dockerfile"]="."
+            ["apps/worker/Dockerfile"]="."
+            ["apps/scraper/Dockerfile"]="."
+            ["infrastructure/caddy/Dockerfile"]="."
+            ["apps/web/Dockerfile"]="apps/web"
+          )
+          found=false
+          for f in "${!targets[@]}"; do
+            if [ -f "$f" ]; then
+              found=true
+              echo "::group::Building $f (context: ${targets[$f]})"
+              docker buildx build --platform linux/amd64,linux/arm64 -f "$f" "${targets[$f]}"
+              echo "::endgroup::"
+            fi
           done
+          if [ "$found" = false ]; then
+            echo "No Dockerfiles yet (land in issue #7) - nothing to build."
+          fi

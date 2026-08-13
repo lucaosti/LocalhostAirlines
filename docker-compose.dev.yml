@@ -1,0 +1,60 @@
+# Development overrides. Deliberately NOT named docker-compose.override.yml:
+# that filename is auto-merged by Compose whenever present, which would make
+# a bare `docker compose up -d` silently run api/worker in --reload/bind-mount
+# mode on a production host too — exactly the ambiguity this project's
+# "extreme portability" and "no surprises" goals rule out (spec §6).
+#
+# Development therefore requires both flags explicitly:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev up
+# or, more practically, `make dev` (see Makefile).
+#
+# Switches api/worker to their `development` build target (full dev
+# dependencies, --reload) and bind-mounts source so edits apply without an
+# image rebuild.
+#
+# Each gets its own `image:` tag, distinct from the production tag the base
+# file implies. Without this, Compose sees an image already exists under the
+# shared default tag and skips rebuilding on `up` — silently running the
+# production target (no --reload) even with this file loaded. Caught for
+# real: the first dev run after a prod build served the wrong binary. `make
+# dev` always passes --build, but the distinct tag makes correctness not
+# depend on remembering that flag.
+
+services:
+  api:
+    image: localhostairlines-api:dev
+    build:
+      target: development
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./domain:/app/domain
+      - ./infrastructure:/app/infrastructure
+      - ./providers:/app/providers
+      - ./normalization:/app/normalization
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./alembic.ini:/app/alembic.ini
+    ports:
+      - "8000:8000"
+
+  worker:
+    image: localhostairlines-worker:dev
+    build:
+      target: development
+    volumes:
+      - ./apps/worker:/app/apps/worker
+      - ./domain:/app/domain
+      - ./infrastructure:/app/infrastructure
+      - ./providers:/app/providers
+      - ./normalization:/app/normalization
+      - ./pyproject.toml:/app/pyproject.toml
+
+  web:
+    volumes:
+      - ./apps/web:/app
+      # Named volume shadows the bind mount for this one path, preserving the
+      # node_modules installed during image build instead of it disappearing
+      # under the host directory's bind mount (which has none).
+      - web_node_modules:/app/node_modules
+
+volumes:
+  web_node_modules:

@@ -1,0 +1,19 @@
+# Minimal working config so the container starts and the six-service topology
+# is real (issue #7). SSE passthrough tuning, timeouts and hardening are
+# issue #16's job (spec §6) — this is deliberately not the final version.
+
+:80 {
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

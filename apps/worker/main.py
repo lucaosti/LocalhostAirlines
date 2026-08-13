@@ -25,7 +25,13 @@ from infrastructure.logging import configure_logging
 # something in this process has already imported models.py too. Discovered
 # for real running issue #44's UI against this worker: the first search ever
 # enqueued failed with NoReferencedTableError, not a fixture gap.
-from infrastructure.postgres import models, models_fx, models_reference, models_search  # noqa: F401
+from infrastructure.postgres import (  # noqa: F401
+    models,
+    models_fx,
+    models_raw,
+    models_reference,
+    models_search,
+)
 from infrastructure.settings import get_settings
 
 logger = logging.getLogger(__name__)

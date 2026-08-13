@@ -399,7 +399,7 @@ Detailed contracts for each are in `docs/providers.md`. Summary:
 | OurAirports | `PUBLIC_DATA` | Airports, IATA/ICAO, coordinates, timezones |
 | OpenFlights | `PUBLIC_DATA` | Airlines, routes |
 | European Central Bank | `PUBLIC_DATA` | Daily FX reference rates |
-| Airline open endpoints | `UNOFFICIAL_ENDPOINT` | Live cash fares for carriers exposing unprotected JSON |
+| ~~Airline open endpoints~~ | `UNOFFICIAL_ENDPOINT` | Rejected — no candidate carrier clears ToS/reachability (issue #2) |
 | Google Flights | `UNOFFICIAL_ENDPOINT` | Broad cash coverage, closer to live |
 | Amex Italy partners page | `SCRAPED` | Transfer ratios, minimums, increments, times |
 | Wikipedia + Farnesina | `SCRAPED` | Visa and entry requirements by passport |
@@ -1319,7 +1319,11 @@ design.
 
 Carried deliberately, to be resolved by time-boxed `type:spike` issues:
 
-1. Which airlines expose usable unprotected endpoints, and with what coverage.
+1. ~~Which airlines expose usable unprotected endpoints, and with what coverage.~~ Resolved:
+   neither candidate qualifies. Ryanair's terms of use explicitly prohibit automated
+   extraction, including via API, with real enforcement history; Wizz Air's site blocks
+   standard automated access at the edge before reachability could even be assessed. No
+   adapter is built in this category (`docs/providers.md` "Airline open endpoints", issue #2).
 2. Whether Google Flights access is stable enough at low volume to be worth its maintenance.
 3. Which award sources are reachable without account automation, and at what quality.
 4. ~~Whether Wikipedia's visa tables are structured consistently enough for reliable parsing

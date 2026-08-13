@@ -133,12 +133,21 @@ async def get_search_results(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),
 ) -> list[ObservationResponse]:
-    await _get_owned_search(db, search_id, user)  # 404/403 before leaking results
+    search = await _get_owned_search(db, search_id, user)  # 404/403 before leaking results
 
+    # Queried by route, not by search_id (issue #54): an observation's
+    # identity is (itinerary_id, source) and it outlives any one Search —
+    # a scheduled re-collection (issue #56) extends the same row rather
+    # than creating a fresh one tied to its own run. "This search's
+    # results" means "this route's current observations".
     rows = (
         (
             await db.execute(
-                select(CashObservation).where(CashObservation.search_id == uuid.UUID(search_id))
+                select(CashObservation).where(
+                    CashObservation.origin == search.origin,
+                    CashObservation.destination == search.destination,
+                    CashObservation.depart_month == search.depart_month,
+                )
             )
         )
         .scalars()

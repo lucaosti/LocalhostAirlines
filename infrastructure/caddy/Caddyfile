@@ -1,19 +1,62 @@
-# Minimal working config so the container starts and the six-service topology
-# is real (issue #7). SSE passthrough tuning, timeouts and hardening are
-# issue #16's job (spec §6) — this is deliberately not the final version.
+# Reverse proxy and static SPA server. Serves the frontend build baked into
+# this image (Dockerfile) and proxies everything else to `api` (spec §6).
+#
+# `:80`, not a real hostname: LAN-only access with no automatic HTTPS (spec
+# §8 — reached as http://travel.local or http://192.168.1.x, never over the
+# public internet). Caddy already skips auto-HTTPS for a bare port like this;
+# no explicit `auto_https off` needed.
+{
+	# No proxy-imposed cutoff on a long-lived connection (issue #16). Search
+	# results and Telegram-triggered watches can legitimately stream for
+	# minutes; a default idle timeout would sever them mid-stream.
+	servers {
+		timeouts {
+			read_body 10s
+			read_header 5s
+			idle 0
+		}
+	}
+}
 
 :80 {
 	handle /api/* {
-		reverse_proxy api:8000
+		reverse_proxy api:8000 {
+			# SSE (Content-Type: text/event-stream) is auto-detected and
+			# flushed immediately by Caddy's proxy transport; flush_interval
+			# -1 makes that explicit for every response through this route
+			# instead of relying on the default heuristic, since this route
+			# also carries ordinary buffered JSON responses.
+			flush_interval -1
+
+			# No response size cap and no per-request timeout on the proxy
+			# side either — matches the global idle=0 above so a search
+			# streaming for minutes is never cut by Caddy itself.
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
 	}
 
-	handle /health {
-		reverse_proxy api:8000
+	handle /health* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
 	}
 
 	handle {
 		root * /srv/www
 		try_files {path} /index.html
 		file_server
+		encode gzip
+	}
+
+	log {
+		output stdout
+		format json
 	}
 }

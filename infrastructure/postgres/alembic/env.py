@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from infrastructure.postgres.base import Base
 from infrastructure.postgres.models import *  # noqa: F401,F403  # registers models on Base.metadata
+from infrastructure.postgres.models_aggregates import *  # noqa: F401,F403
 from infrastructure.postgres.models_fx import *  # noqa: F401,F403
 from infrastructure.postgres.models_health import *  # noqa: F401,F403
 from infrastructure.postgres.models_raw import *  # noqa: F401,F403

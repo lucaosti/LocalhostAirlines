@@ -10,11 +10,14 @@ plumbing for load balancers and container orchestration, not a resource in the
 domain contract that docs/api.md governs.
 """
 
+import asyncio
 import time
+from collections.abc import AsyncIterator
 from typing import Literal
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,3 +75,28 @@ async def health(
         overall = "ok"
 
     return HealthResponse(status=overall, checks={"database": database, "redis": cache})
+
+
+async def _heartbeat_events() -> AsyncIterator[str]:
+    sequence = 0
+    while True:
+        yield f'event: heartbeat\ndata: {{"sequence": {sequence}}}\n\n'
+        sequence += 1
+        await asyncio.sleep(1)
+
+
+@router.get("/health/stream")
+async def health_stream() -> StreamingResponse:
+    """A minimal, permanent SSE probe.
+
+    Real search progress streaming lands at M3 (spec §30). This exists earlier
+    and stays afterward, for a narrower reason: it is the smallest possible way
+    to verify, end to end through Caddy, that a streaming response actually
+    arrives incrementally rather than being buffered until the connection
+    closes — the one failure mode that would make every progressive search
+    result silently degrade into "wait, then get everything at once" (issue
+    #16). `curl --no-buffer` against this in CI or by hand is a two-second
+    regression test for that failure mode without needing the real search
+    pipeline to exist.
+    """
+    return StreamingResponse(_heartbeat_events(), media_type="text/event-stream")

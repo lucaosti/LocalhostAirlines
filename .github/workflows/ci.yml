@@ -65,6 +65,16 @@ jobs:
           cache: pip
       - run: pip install -e '.[dev]'
 
+      # Explicit and required: earlier runs "worked" only because
+      # test_migrations.py's own body happens to call `alembic upgrade head`
+      # as its subject matter, and file collection order put it before every
+      # test needing a schema. That was never a real dependency, just
+      # alphabetical luck — it broke silently the moment test_auth.py sorted
+      # ahead of test_migrations.py and every auth test failed with
+      # "relation users does not exist". The schema is provisioned here,
+      # explicitly, independent of which test file happens to run first.
+      - run: alembic upgrade head
+
       # This *is* the migration round-trip acceptance criterion: the test runs
       # upgrade -> downgrade -> upgrade -> downgrade -> upgrade against the
       # service container above, not a single one-way `alembic upgrade head`.

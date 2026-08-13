@@ -564,7 +564,8 @@ combination the system chose not to spend budget on is unknown, and the interfac
 (P3). Reporting it as empty would make the cheapest search look like the most thorough one.
 
 Persistent watches receive a recurring daily allocation and spend it across their space over
-time, so coverage accumulates rather than repeating the same probes.
+time, so coverage accumulates rather than repeating the same probes. Default allocation and
+the resulting volume estimate: `docs/adr/0007-observation-volume-estimate.md`.
 
 ## 29. Search state machine
 
@@ -1331,4 +1332,8 @@ Carried deliberately, to be resolved by time-boxed `type:spike` issues:
    suffices — table shape is consistent across sampled major, mid-size and micro-state
    passport pages; what varies is cell completeness, already handled by the existing
    `UNKNOWN`-over-guess rule (`docs/providers.md` "Visa requirements" § Parsing, issue #5).
-5. Realistic observation volume per day, and therefore actual storage growth.
+5. ~~Realistic observation volume per day, and therefore actual storage growth.~~ Resolved by
+   calculation: `docs/adr/0007-observation-volume-estimate.md` (issue #6). Flagged there for
+   re-verification against live Travelpayouts traffic once issue #22 has run for a week —
+   that follow-up does not reopen this question, since it revisits an accepted estimate rather
+   than an unanswered one.

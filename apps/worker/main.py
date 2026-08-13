@@ -30,6 +30,7 @@ from infrastructure.postgres import (  # noqa: F401
     models,
     models_fx,
     models_health,
+    models_raw,
     models_reference,
     models_search,
 )

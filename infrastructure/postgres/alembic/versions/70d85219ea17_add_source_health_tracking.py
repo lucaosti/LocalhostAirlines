@@ -1,7 +1,7 @@
 """add source health tracking
 
 Revision ID: 70d85219ea17
-Revises: 93b84082fc41
+Revises: 5c44068e84aa
 Create Date: 2026-08-13 19:52:30.519706
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "70d85219ea17"
-down_revision: str | None = "93b84082fc41"
+down_revision: str | None = "5c44068e84aa"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

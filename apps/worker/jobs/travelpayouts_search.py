@@ -4,7 +4,9 @@ fetch (providers.travelpayouts.client, issue #41) -> normalize
 (normalization.travelpayouts, issue #42) -> quality gate -> write
 (spec §56's write order, applied here in its thinnest possible form — no
 material-change dedup or partitioning yet, that is spec §56's full M2
-design).
+design). The fetch is now guarded by a per-source circuit breaker (issue
+#56, spec §21/§25): repeated source-side failures stop further calls rather
+than retrying harder.
 """
 
 from __future__ import annotations
@@ -21,10 +23,13 @@ from domain.flight.serialization import offer_to_dict
 from infrastructure.postgres.database import session_scope
 from infrastructure.postgres.models_reference import Airport
 from infrastructure.postgres.models_search import CashObservation, Search, SearchState
+from infrastructure.postgres.source_health import may_call, record_failure, record_success
 from infrastructure.settings import get_settings
 from normalization.travelpayouts import normalize_price_calendar
 from providers.errors import SourceError, SourceErrorKind
 from providers.travelpayouts.client import PriceCalendarRequest, fetch_price_calendar
+
+SOURCE_ID = "travelpayouts"
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +56,7 @@ async def run_travelpayouts_search(
     except SourceError as exc:
         logger.warning("travelpayouts search %s failed: %s", search_id, exc)
         async with session_scope() as db:
+            await record_failure(db, exc.source_id, exc.kind)
             search = await _get_search(db, search_id)
             search.state = SearchState.FAILED
             search.failure_reason = exc.kind.value
@@ -58,6 +64,7 @@ async def run_travelpayouts_search(
         return
 
     async with session_scope() as db:
+        await record_success(db, SOURCE_ID)
         search = await _get_search(db, search_id)
         now = datetime.now(UTC)
         for offer in offers:
@@ -108,16 +115,26 @@ async def _run(search_id: str, fetch: Any) -> list:
             raise SourceError(
                 SourceErrorKind.NOT_AVAILABLE,
                 f"no resolved timezone for origin airport {origin}",
-                source_id="travelpayouts",
+                source_id=SOURCE_ID,
             )
         origin_timezone = airport.timezone
+
+        # Checked inside the same session as the lookups above so a
+        # currently-open circuit is rejected before a token check or fetch
+        # is even attempted (issue #56).
+        if not await may_call(db, SOURCE_ID):
+            raise SourceError(
+                SourceErrorKind.BLOCKED,
+                "circuit open — recent failures exceeded threshold",
+                source_id=SOURCE_ID,
+            )
 
     token = get_settings().travelpayouts_token
     if not token:
         raise SourceError(
             SourceErrorKind.AUTHENTICATION,
             "TRAVELPAYOUTS_TOKEN is not configured",
-            source_id="travelpayouts",
+            source_id=SOURCE_ID,
         )
 
     retrieved_at = datetime.now(UTC)

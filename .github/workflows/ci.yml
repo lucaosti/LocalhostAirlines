@@ -111,9 +111,13 @@ jobs:
       - if: steps.detect.outputs.present == 'true'
         working-directory: apps/web
         run: npm ci
+      # TanStack Router's plugin generates src/routeTree.gen.ts as a build-time
+      # side effect (this version exposes no cheaper standalone codegen entry
+      # point) — so the real build IS the typecheck gate, not a separate
+      # `tsc --noEmit` that would fail on the missing generated file.
       - if: steps.detect.outputs.present == 'true'
         working-directory: apps/web
-        run: npx tsc --noEmit
+        run: npm run build
       - if: steps.detect.outputs.present == 'false'
         # A plain single-line YAML scalar treats " #" mid-string as a comment
         # start and truncates here — this bit us for real on the first CI run,

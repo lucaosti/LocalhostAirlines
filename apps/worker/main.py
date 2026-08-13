@@ -1,9 +1,9 @@
 """ARQ worker: scheduled jobs, cron schedules, Telegram polling (CLAUDE.md §6).
 
-Empty function and cron lists are correct for M0 — the scheduler and Telegram
-bot are asyncio loops added here as their own issues land (#14, #15, and the
-M8 Telegram work). An ARQ worker with no jobs registered still runs, connects
-to Redis, and is a real, checkable deployment target rather than a stub.
+Real jobs land here as their own issues close (#15 below; the M8 Telegram
+bot is still an asyncio loop to be added later). An ARQ worker with no jobs
+registered still runs and connects to Redis, but is otherwise a stub — the
+heartbeat cron exists only so ARQ has something to schedule until then.
 """
 
 import logging
@@ -12,6 +12,7 @@ from typing import Any
 from arq.connections import RedisSettings
 from arq.cron import cron
 
+from apps.worker.jobs.fx_rates import ingest_fx_rates
 from infrastructure.logging import configure_logging
 from infrastructure.settings import get_settings
 
@@ -41,8 +42,16 @@ class WorkerSettings:
     builds the actual Worker instance — not instantiated directly here.
     """
 
-    functions: list[Any] = []
-    cron_jobs: list[Any] = [cron(heartbeat, minute=set(range(0, 60, 5)))]
+    functions: list[Any] = [ingest_fx_rates]
+    cron_jobs: list[Any] = [
+        cron(heartbeat, minute=set(range(0, 60, 5))),
+        # ECB publishes once per TARGET business day around 16:00 CET; running
+        # a bit after that covers the publication with margin. The job
+        # re-fetches the whole 90-day window every time (insert-or-skip), so
+        # a missed run is self-healing on the next one rather than needing a
+        # backfill.
+        cron(ingest_fx_rates, hour=17, minute=0),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

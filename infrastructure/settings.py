@@ -23,6 +23,25 @@ class Settings(BaseSettings):
     travelpayouts_token: str | None = Field(default=None, alias="TRAVELPAYOUTS_TOKEN")
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
 
+    # The session cookie's Secure attribute defaults False to match the
+    # documented deployment: plain HTTP on a trusted LAN (spec §8, §157). A
+    # browser never sends a Secure cookie back over plain HTTP, so setting
+    # this unconditionally would break login on the default deployment.
+    # Flip it on for anyone terminating TLS in front of Caddy.
+    cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
+
+    session_ttl_hours: int = Field(default=24 * 14, alias="SESSION_TTL_HOURS")
+
+    # Login rate limiting lives in Redis (spec §82: cache-shaped, not a
+    # source of truth) and fails open if Redis is unreachable — losing
+    # brute-force protection briefly is preferable to locking every user
+    # out of an otherwise-working login because a cache is down.
+    login_rate_limit_per_account: int = Field(default=5, alias="LOGIN_RATE_LIMIT_PER_ACCOUNT")
+    login_rate_limit_per_ip: int = Field(default=20, alias="LOGIN_RATE_LIMIT_PER_IP")
+    login_rate_limit_window_seconds: int = Field(
+        default=300, alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS"
+    )
+
     @field_validator("secret_key")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:

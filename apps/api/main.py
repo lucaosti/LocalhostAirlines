@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from apps.api.errors import register_error_handlers
-from apps.api.routers import health
+from apps.api.routers import auth, health
 from infrastructure.logging import configure_logging
 from infrastructure.settings import get_settings
 
@@ -39,8 +39,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
 
     v1 = APIRouter(prefix="/api/v1")
-    # Domain routers (auth, travellers, searches, ...) attach to `v1` as they
-    # land in their own issues, keeping the version boundary in exactly one place.
+    # Domain routers attach to `v1` as they land in their own issues, keeping
+    # the version boundary in exactly one place.
+    v1.include_router(auth.router)
     app.include_router(v1)
 
     return app

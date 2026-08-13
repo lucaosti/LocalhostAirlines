@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { ValuedDemo } from "../components/ValuedDemo";
 
 export const Route = createFileRoute("/")({
@@ -11,6 +11,9 @@ function Index() {
       <h1>Foundation skeleton</h1>
       <p>Demonstrates the Valued&lt;T&gt; provenance envelope (docs/api.md §3).</p>
       <ValuedDemo />
+      <p>
+        <Link to="/search">M1 walking skeleton search →</Link>
+      </p>
     </main>
   );
 }

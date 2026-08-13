@@ -12,6 +12,15 @@ export default defineConfig({
     // the host (CLAUDE.md §6, Docker Compose dev profile).
     host: true,
     port: 5173,
+    // Mirrors Caddy's production routing (infrastructure/caddy/Caddyfile) so
+    // the SPA talks to /api same-origin in dev too — required, not just
+    // convenient: the session cookie is SameSite=Strict (docs/api.md §2), so
+    // a cross-origin request to the api container's own port would never
+    // carry it regardless of CORS configuration.
+    proxy: {
+      "/api": { target: "http://api:8000", changeOrigin: true },
+      "/health": { target: "http://api:8000", changeOrigin: true },
+    },
   },
   build: {
     outDir: "dist",

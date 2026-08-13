@@ -15,6 +15,17 @@ from apps.worker.jobs.fx_rates import ingest_fx_rates
 from apps.worker.jobs.reference_data import ingest_reference_data
 from apps.worker.jobs.travelpayouts_search import run_travelpayouts_search
 from infrastructure.logging import configure_logging
+
+# Every model module, imported here for its side effect of registering on
+# Base.metadata — same reasoning as infrastructure/postgres/alembic/env.py.
+# A job module only imports the tables it directly reads or writes (e.g.
+# travelpayouts_search.py imports models_search and models_reference, never
+# models.py), so a cross-module ForeignKey string reference like
+# Search.user_id -> "users.id" fails to resolve at flush time unless
+# something in this process has already imported models.py too. Discovered
+# for real running issue #44's UI against this worker: the first search ever
+# enqueued failed with NoReferencedTableError, not a fixture gap.
+from infrastructure.postgres import models, models_fx, models_reference, models_search  # noqa: F401
 from infrastructure.settings import get_settings
 
 logger = logging.getLogger(__name__)

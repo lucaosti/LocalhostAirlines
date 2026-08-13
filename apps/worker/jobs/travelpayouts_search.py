@@ -1,10 +1,11 @@
-"""Runs one M1 walking-skeleton search: fetch -> normalize -> persist (issue #43).
+"""Runs one M1 walking-skeleton search: fetch -> retain raw -> normalize ->
+persist (issues #43, #52).
 
-fetch (providers.travelpayouts.client, issue #41) -> normalize
-(normalization.travelpayouts, issue #42) -> quality gate -> write
-(spec §56's write order, applied here in its thinnest possible form — no
-material-change dedup or partitioning yet, that is spec §56's full M2
-design).
+fetch (providers.travelpayouts.client, issue #41) -> raw retention (issue
+#52, spec §4/§55) -> normalize (normalization.travelpayouts, issue #42) ->
+quality gate -> write (spec §56's write order, applied here in its thinnest
+possible form — no material-change dedup or partitioning yet, that is spec
+§56's full M2 design, issues #53/#54).
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from domain.flight.serialization import offer_to_dict
 from infrastructure.postgres.database import session_scope
 from infrastructure.postgres.models_reference import Airport
 from infrastructure.postgres.models_search import CashObservation, Search, SearchState
+from infrastructure.postgres.raw_payloads import store_raw_payload
 from infrastructure.settings import get_settings
 from normalization.travelpayouts import normalize_price_calendar
 from providers.errors import SourceError, SourceErrorKind
@@ -125,6 +127,22 @@ async def _run(search_id: str, fetch: Any) -> list:
         PriceCalendarRequest(origin=origin, destination=destination, depart_date=depart_month),
         token,
     )
+
+    # Committed in its own transaction, before normalization runs: a
+    # SCHEMA_CHANGE or other normalization failure below must not roll back
+    # the raw payload along with it — an unparseable payload today is
+    # exactly the case spec §4's reprocessing guarantee exists for (issue
+    # #52).
+    request_key = f"{origin}-{destination}:{depart_month}"
+    async with session_scope() as db:
+        await store_raw_payload(
+            db,
+            source="travelpayouts",
+            request_key=request_key,
+            payload=raw,
+            retrieved_at=retrieved_at,
+        )
+
     return normalize_price_calendar(
         raw, origin_timezone=origin_timezone, currency="eur", retrieved_at=retrieved_at
     )

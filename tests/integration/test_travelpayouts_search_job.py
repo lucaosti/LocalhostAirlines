@@ -55,7 +55,17 @@ async def _fetch_fixture(request, token):
 
 
 async def _seed_airport(iata_code: str) -> None:
+    # Idempotent: "MXP"/"NRT" are common fixture codes other integration
+    # tests also seed against this same shared, never-truncated database
+    # (matching the project's own established convention of unique-per-test
+    # identifiers instead of teardown) — a plain insert would collide
+    # whenever this test runs after one of them in the same session.
     async with session_scope() as db:
+        existing = (
+            await db.execute(select(Airport).where(Airport.iata_code == iata_code))
+        ).scalar_one_or_none()
+        if existing is not None:
+            return
         db.add(
             Airport(
                 icao_code=f"Z{iata_code}",
@@ -76,6 +86,11 @@ async def _seed_airport(iata_code: str) -> None:
 
 async def _seed_carrier(iata_code: str) -> None:
     async with session_scope() as db:
+        existing = (
+            await db.execute(select(Airline).where(Airline.iata_code == iata_code))
+        ).scalar_one_or_none()
+        if existing is not None:
+            return
         db.add(
             Airline(
                 icao_code=f"Z{iata_code}",

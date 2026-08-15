@@ -49,6 +49,12 @@ async def _seed_observed_route(
     now = datetime.now(UTC)
     search_id = uuid.uuid4()
     year, month_number = (int(part) for part in month.split("-"))
+    # Two transactions, not one: matches how the real code always does it
+    # (the search row is committed before write_observation ever runs, in a
+    # separate call). Adding both objects to a single session doesn't
+    # guarantee insert order across unrelated mappers with no relationship()
+    # between them, so a single flush here can hit the observation's FK to
+    # `searches` before the search row itself is actually inserted.
     async with session_scope() as db:
         db.add(
             Search(
@@ -73,6 +79,8 @@ async def _seed_observed_route(
                 completed_at=now,
             )
         )
+
+    async with session_scope() as db:
         db.add(
             CashObservation(
                 id=uuid.uuid4(),

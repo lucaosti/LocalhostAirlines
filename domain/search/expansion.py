@@ -1,12 +1,11 @@
-"""Search-space expansion and batch collapsing (issue #62; spec §27, §28).
-Pure, no I/O.
+"""Search-space expansion and batch collapsing (spec §27, §28). Pure, no I/O.
 
 "The naive expansion is origins × destinations × departure dates × trip
 lengths × cabins. For the query [in spec §27's example] that is roughly
 2,200 combinations — far beyond any source's tolerance" (spec §28). This
 module produces that full expansion and then collapses what one batch-
-capable source call can answer at once, before the budget (issue #63)
-decides what actually gets spent.
+capable source call can answer at once, before the budget
+(domain/search/budget.py) decides what actually gets spent.
 """
 
 from __future__ import annotations
@@ -90,10 +89,10 @@ class BatchGroup:
     "Adapter contract"). Collapses only the departure-date dimension within
     a month, since that is specifically what spec §28 describes; cabin and
     trip length stay distinct because a genuinely batch-capable source
-    *could* vary by those even though Travelpayouts (the only adopted
-    source, issue #41) does not — collapsing further than a source actually
-    supports is that source adapter's own decision, not this domain
-    function's to assume for every source.
+    *could* vary by those even though Travelpayouts (the only adopted source
+    so far) does not — collapsing further than a source actually supports is
+    that source adapter's own decision, not this domain function's to assume
+    for every source.
     """
 
     origin: str

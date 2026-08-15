@@ -16,7 +16,7 @@ dependencies = [
     "arq>=0.26",
     "httpx>=0.27",
     # Offline coordinate -> IANA timezone lookup, the fallback step of the
-    # airport timezone resolution chain (docs/providers.md, issue #14).
+    # airport timezone resolution chain (docs/providers.md).
     "timezonefinder>=6.5",
 ]
 

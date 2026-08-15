@@ -1,5 +1,5 @@
-"""Scheduled re-collection of previously searched routes (issue #56; spec
-§21, docs/adr/0005 "the historical clock starts at M2").
+"""Scheduled re-collection of previously searched routes (spec §21,
+docs/adr/0005 "the historical clock starts at M2").
 
 M2 predates M8's user-facing watchlist — there is no "watch" object yet to
 spend a recurring budget against (spec §28 describes that mechanism for
@@ -10,8 +10,8 @@ placeholder watchlist implementation — M8 replaces "every route ever
 searched" with real watch objects and per-watch budgets; it does not need
 this job's internals to anticipate that shape.
 
-The per-source circuit breaker (issue #56) is enforced inside
-run_travelpayouts_search itself, not duplicated here — this job just
+The per-source circuit breaker is enforced inside run_travelpayouts_search
+itself, not duplicated here — this job just
 enqueues; a source with an open circuit fails each enqueued search fast
 rather than this job trying to pre-filter routes by source health.
 """

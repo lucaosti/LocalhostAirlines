@@ -12,7 +12,7 @@ ordinary table into a partitioned one, so both tables are dropped and
 recreated as partitioned parents with the same columns spec §55 already
 established, plus initial bootstrap partitions so inserts work immediately
 after this migration without waiting for the maintenance job's own monthly
-schedule (issue #53, apps/worker/jobs/maintain_partitions.py) to run.
+schedule (apps/worker/jobs/maintain_partitions.py) to run.
 
 Pre-production (CLAUDE.md's stated current project state: no deployment
 exists yet), so dropping and recreating loses no real data — the same

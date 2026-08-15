@@ -1,4 +1,4 @@
-"""infrastructure/postgres/source_health.py against real Postgres (issue #56)."""
+"""infrastructure/postgres/source_health.py against real Postgres."""
 
 import uuid
 

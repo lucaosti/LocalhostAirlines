@@ -1,4 +1,4 @@
-"""infrastructure/postgres/observations.py against real Postgres (issue #54)."""
+"""infrastructure/postgres/observations.py against real Postgres."""
 
 import uuid
 from datetime import UTC, datetime, timedelta

@@ -1,4 +1,4 @@
-"""apps/worker/jobs/maintain_partitions.py against real Postgres (issue #53)."""
+"""apps/worker/jobs/maintain_partitions.py against real Postgres."""
 
 from datetime import UTC, date, datetime
 

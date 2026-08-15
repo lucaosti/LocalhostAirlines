@@ -2,7 +2,7 @@ import type { Valued } from "./valued";
 
 /**
  * Thin fetch wrappers for the M1 search slice (docs/api.md §5, §7 — the
- * thin M1 subset issue #43 implements, not the full multi-origin/budget/SSE
+ * thin M1 subset implemented so far, not the full multi-origin/budget/SSE
  * resource). `credentials: "include"` on every call so the httpOnly session
  * cookie (docs/api.md §2) rides along automatically.
  */

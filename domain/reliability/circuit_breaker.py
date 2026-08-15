@@ -1,4 +1,4 @@
-"""Circuit breaker decision logic (issue #56; spec §21, §25). Pure, no I/O.
+"""Circuit breaker decision logic (spec §21, §25). Pure, no I/O.
 
 "Repeated BLOCKED classifications reduce the access rate automatically
 rather than triggering retries" (spec §26, restated for Google Flights but

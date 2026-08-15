@@ -27,7 +27,8 @@ dist/
 # pattern would also catch a hypothetical unrelated src/ elsewhere, and a
 # root-anchored one (a bare "src/routeTree.gen.ts") only matches at the repo
 # root, not apps/web/src/ — silently missing the actual generated file and
-# staging it by accident, which is how this got noticed (issue #44).
+# staging it by accident, which is how this got noticed while building the
+# SPA skeleton.
 **/src/routeTree.gen.ts
 
 # Local data. Volumes live in Docker, but keep stray dumps out of the tree.

@@ -1,4 +1,4 @@
-"""POST/GET /api/v1/searches against real Postgres (issue #43).
+"""POST/GET /api/v1/searches against real Postgres.
 
 The ARQ pool dependency is overridden with a fake that records the enqueued
 job instead of requiring a live Redis + worker process — this test verifies

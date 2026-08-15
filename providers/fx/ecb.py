@@ -1,4 +1,4 @@
-"""ECB FX reference rates adapter (issue #15, spec §82).
+"""ECB FX reference rates adapter (spec §82).
 
 Same fetch/parse split as the other providers/ adapters: `fetch_fx_rates()`
 does the network call, `parse_fx_rates()` is pure and independently

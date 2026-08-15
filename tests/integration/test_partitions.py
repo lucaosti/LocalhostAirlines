@@ -1,4 +1,4 @@
-"""infrastructure/postgres/partitions.py against real Postgres (issue #53)."""
+"""infrastructure/postgres/partitions.py against real Postgres."""
 
 import uuid
 from datetime import UTC, date, datetime

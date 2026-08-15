@@ -123,8 +123,8 @@ def register_error_handlers(app: FastAPI) -> None:
         # travellers.py's passport_codes_are_alpha2), which plain
         # json.dumps cannot serialize. jsonable_encoder converts it (and
         # anything else non-primitive) to a JSON-safe form first — this was
-        # unreachable until issue #43's own validators started raising with
-        # a message, which is what surfaced it here.
+        # unreachable until a real field_validator started raising with a
+        # message, which is what surfaced it here.
         problem = {
             "type": f"{PROBLEM_BASE}/unprocessable",
             "title": "Semantically invalid request",

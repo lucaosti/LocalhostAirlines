@@ -1,9 +1,9 @@
-"""Travelpayouts payload -> canonical model (issue #42; spec §5, §14, §16).
+"""Travelpayouts payload -> canonical model (spec §5, §14, §16).
 
 Only this module knows the shape of a Travelpayouts `/v1/prices/calendar`
 response. It converts that shape into `domain.flight.model.FlightOffer` and
 nothing else — no loyalty, no ranking, no I/O against the source (that is
-providers.travelpayouts.client's job, issue #41).
+providers.travelpayouts.client's job).
 
 Pure and offline: takes the origin airport's IANA timezone as an argument
 rather than looking it up, so this module never touches a database and stays
@@ -128,9 +128,8 @@ def _normalize_entry(
     # Travelpayouts' documented examples show prices as bare integers with no
     # decimal point (e.g. "price": 35443 for RUB) — read here as whole
     # currency units, not minor units already. UNVERIFIED against a live
-    # response (issue #41 is still pending a real token); re-check this
-    # assumption during that live-verification pass before trusting displayed
-    # prices.
+    # response as of writing; re-check this assumption during the first live
+    # run against a real token before trusting displayed prices.
     price_minor = round(entry["price"] * 100)
 
     return FlightOffer(

@@ -1,4 +1,4 @@
-"""apps/worker/jobs/daily_aggregates.py against real Postgres (issue #55)."""
+"""apps/worker/jobs/daily_aggregates.py against real Postgres."""
 
 import uuid
 from datetime import UTC, datetime, timedelta

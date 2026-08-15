@@ -1,4 +1,4 @@
-"""Nightly flight_price_daily aggregation job (issue #55; spec §57).
+"""Nightly flight_price_daily aggregation job (spec §57).
 
 Full recompute each run: at M2's projected observation volume (~2M rows/year,
 docs/adr/0007-observation-volume-estimate.md), reprocessing everything

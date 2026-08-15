@@ -1,4 +1,4 @@
-"""Partition maintenance for declaratively partitioned tables (issue #53; spec §55).
+"""Partition maintenance for declaratively partitioned tables (spec §55).
 
 Creates the next N months of partitions (idempotent — safe to run every
 invocation) and enforces raw-payload retention by detaching and dropping

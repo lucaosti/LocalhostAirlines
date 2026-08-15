@@ -1,4 +1,4 @@
-"""Raw payload retention against real Postgres (issue #52).
+"""Raw payload retention against real Postgres.
 
 The key property under test: the raw payload survives even when
 normalization fails on it — that is the entire point of retaining it

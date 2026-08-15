@@ -3,9 +3,9 @@ import type { SearchIn } from "../api/client";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-/** M1's search is one origin, one destination, one month (issue #43's own
- * scope note) — not the multi-origin/date-range form the M3-extended
- * resource will eventually need. */
+/** M1's search is one origin, one destination, one month, deliberately —
+ * not the multi-origin/date-range form the M3-extended resource will
+ * eventually need. */
 export function SearchForm({
   onSubmit,
   disabled,

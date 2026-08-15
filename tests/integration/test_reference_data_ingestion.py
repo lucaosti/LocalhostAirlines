@@ -100,8 +100,8 @@ async def test_disappearing_codes_are_deactivated_not_deleted() -> None:
         fco = await db.get(Airport, "LIRF")
         afr = await db.get(Airline, "AFR")
 
-    # Deactivated, never hard-deleted (issue #14 acceptance criterion) — the
-    # row still exists for anything that already references it.
+    # Deactivated, never hard-deleted — the row still exists for anything
+    # that already references it.
     assert fco is not None
     assert fco.active is False
     assert afr is not None

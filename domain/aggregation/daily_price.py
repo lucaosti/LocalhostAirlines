@@ -1,12 +1,13 @@
-"""Nightly flight_price_daily aggregation (issue #55; spec §57). Pure, no I/O.
+"""Nightly flight_price_daily aggregation (spec §57). Pure, no I/O.
 
 "A day is covered by every observation whose [first_seen_at, last_seen_at]
 interval intersects it, so a price that held for a week contributes to all
 seven days exactly once each — which is what 'the price on that day' means"
-(spec §57). Depends on issue #54's material-change dedup: computing this
-over one-row-per-fetch data would double-count polling frequency, the exact
-failure spec §56 exists to prevent — the same failure would just move one
-layer up into the aggregate instead of being fixed.
+(spec §57). Depends on the material-change dedup upstream (domain/collection/
+material_change.py, spec §56): computing this over one-row-per-fetch data
+would double-count polling frequency, the exact failure spec §56 exists to
+prevent — the same failure would just move one layer up into the aggregate
+instead of being fixed.
 """
 
 from __future__ import annotations

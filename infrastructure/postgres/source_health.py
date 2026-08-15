@@ -1,4 +1,4 @@
-"""Per-source circuit breaker, backed by SourceHealth (issue #56).
+"""Per-source circuit breaker, backed by SourceHealth (spec §21, §25).
 
 Bridges the pure decision logic in domain/reliability/circuit_breaker.py to
 persistence, and decides which spec §26 error kinds are circuit-relevant in

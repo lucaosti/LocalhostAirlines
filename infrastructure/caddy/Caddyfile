@@ -6,9 +6,9 @@
 # public internet). Caddy already skips auto-HTTPS for a bare port like this;
 # no explicit `auto_https off` needed.
 {
-	# No proxy-imposed cutoff on a long-lived connection (issue #16). Search
-	# results and Telegram-triggered watches can legitimately stream for
-	# minutes; a default idle timeout would sever them mid-stream.
+	# No proxy-imposed cutoff on a long-lived connection. Search results and
+	# Telegram-triggered watches can legitimately stream for minutes; a
+	# default idle timeout would sever them mid-stream.
 	servers {
 		timeouts {
 			read_body 10s

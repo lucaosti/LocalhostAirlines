@@ -97,7 +97,7 @@ async def test_companion_requires_explicit_points_relationship() -> None:
         ).json()
 
         # No points_relationship in the body at all — must be rejected, not
-        # defaulted (issue #13's central acceptance criterion).
+        # defaulted silently.
         missing_field = await client.post(
             f"/api/v1/travellers/{primary['id']}/companions",
             json={"companion_id": companion["id"]},

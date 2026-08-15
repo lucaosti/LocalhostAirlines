@@ -1,5 +1,4 @@
-"""Reference data: airports, airlines, and derived airport groups (spec §124,
-issue #14).
+"""Reference data: airports, airlines, and derived airport groups (spec §124).
 
 Kept separate from models.py — a distinct concern (provider-sourced reference
 data refreshed on a schedule) from the user/traveller domain. Both modules
@@ -46,9 +45,10 @@ class Airport(Base):
     timezone_resolution: Mapped[TimezoneResolution] = mapped_column()
 
     # Soft delete: a code that disappears from upstream is deactivated, never
-    # hard-deleted, so historical rows referencing it stay valid (issue #14
-    # acceptance criterion: "codes disappearing... are logged, not silently
-    # dropped").
+    # hard-deleted, so historical rows referencing it stay valid — a
+    # disappearing code must be logged, not silently dropped, or a route
+    # observed last month would become unexplainable once the airport it
+    # touched vanishes from the reference table.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     source: Mapped[str] = mapped_column(String(32))

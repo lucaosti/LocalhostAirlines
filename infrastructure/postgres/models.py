@@ -39,8 +39,8 @@ class PointsRelationship(enum.StrEnum):
 
     The default on creation is NOT_COMBINABLE — most programmes forbid pooling,
     and assuming otherwise produces advice the user cannot act on. The API layer
-    (issue #13) must require this value explicitly rather than defaulting it
-    silently, so the safe default is a decision, not an accident.
+    must require this value explicitly rather than defaulting it silently, so
+    the safe default is a decision, not an accident.
     """
 
     INDIVIDUALLY_USABLE = "INDIVIDUALLY_USABLE"

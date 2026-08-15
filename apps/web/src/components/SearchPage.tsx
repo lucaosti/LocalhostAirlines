@@ -9,7 +9,7 @@ import { SearchResults } from "./SearchResults";
 const TERMINAL_STATES = new Set(["ready", "failed"]);
 
 /** Orchestrates the M1 walking skeleton end to end: sign in, trigger a
- * search, poll it to completion, show what came back (issue #44). */
+ * search, poll it to completion, show what came back. */
 export function SearchPage() {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [searchId, setSearchId] = useState<string | null>(null);
@@ -29,8 +29,8 @@ export function SearchPage() {
     refetchInterval: (query) =>
       query.state.data && TERMINAL_STATES.has(query.state.data.state) ? false : 1000,
     // TanStack Query pauses interval polling while the document is hidden by
-    // default. Found running this against a real browser tab (issue #44):
-    // switch away mid-search and the page silently stops updating until
+    // default. Found running this against a real browser tab: switch away
+    // mid-search and the page silently stops updating until
     // refocused. A search here resolves in well under a second today, but
     // M3's real multi-source searches will not, so this is worth being
     // correct about now rather than rediscovering it later.

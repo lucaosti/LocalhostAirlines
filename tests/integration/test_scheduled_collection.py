@@ -1,4 +1,4 @@
-"""apps/worker/jobs/scheduled_collection.py against real Postgres (issue #56)."""
+"""apps/worker/jobs/scheduled_collection.py against real Postgres."""
 
 import uuid
 from datetime import UTC, datetime

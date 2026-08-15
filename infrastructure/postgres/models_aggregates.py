@@ -1,4 +1,4 @@
-"""Nightly price aggregates (issue #55; spec §57).
+"""Nightly price aggregates (spec §57).
 
 `cabin`/`fare_family` are non-nullable empty-string, not NULL, when the
 source doesn't state them — a deliberate choice distinct from spec P3's

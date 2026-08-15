@@ -1,4 +1,4 @@
-"""Raw payload compression and storage (issue #52).
+"""Raw payload compression and storage (spec §4, §55).
 
 Kept separate from models_raw.py so the model stays a plain schema
 declaration and this module owns the encode/decode policy — the same split

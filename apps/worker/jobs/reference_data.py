@@ -1,4 +1,4 @@
-"""Reference data ingestion job (issue #14, spec §12, §36).
+"""Reference data ingestion job (spec §12, §36).
 
 fetch -> normalize -> upsert -> soft-delete missing -> recompute groups, run
 monthly by the scheduler (apps/worker/main.py). Registered as a real ARQ
@@ -90,8 +90,7 @@ async def _upsert_airports(canonical: list[CanonicalAirport], now: datetime) -> 
                 current.retrieved_at = now
 
         # Soft delete: a code no longer present upstream is deactivated, not
-        # dropped, so anything that already references it stays valid
-        # (issue #14 acceptance criterion).
+        # dropped, so anything that already references it stays valid.
         for icao_code, current in existing.items():
             if icao_code not in seen_codes and current.active:
                 current.active = False

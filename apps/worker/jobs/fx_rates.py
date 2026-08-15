@@ -1,4 +1,4 @@
-"""ECB FX rate ingestion job (issue #15).
+"""ECB FX rate ingestion job (spec §82).
 
 Same injectable-fetcher pattern as apps/worker/jobs/reference_data.py: the
 real network fetch is a keyword-only default so tests can substitute a

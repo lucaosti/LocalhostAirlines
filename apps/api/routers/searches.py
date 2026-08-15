@@ -1,4 +1,4 @@
-"""M1 walking-skeleton search: one source, one route (issue #43; docs/api.md §5, §7).
+"""M1 walking-skeleton search: one source, one route (docs/api.md §5, §7).
 
 Deliberately not the full search resource from docs/api.md §5 — no
 multi-origin/destination expansion, no query budget, no SSE. Those are the
@@ -135,11 +135,11 @@ async def get_search_results(
 ) -> list[ObservationResponse]:
     search = await _get_owned_search(db, search_id, user)  # 404/403 before leaking results
 
-    # Queried by route, not by search_id (issue #54): an observation's
-    # identity is (itinerary_id, source) and it outlives any one Search —
-    # a scheduled re-collection (issue #56) extends the same row rather
-    # than creating a fresh one tied to its own run. "This search's
-    # results" means "this route's current observations".
+    # Queried by route, not by search_id: an observation's identity is
+    # (itinerary_id, source) and it outlives any one Search — a scheduled
+    # re-collection extends the same row rather than creating a fresh one
+    # tied to its own run. "This search's results" means "this route's
+    # current observations".
     rows = (
         (
             await db.execute(

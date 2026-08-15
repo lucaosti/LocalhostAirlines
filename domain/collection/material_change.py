@@ -1,4 +1,4 @@
-"""Material-change decision for observation writes (issue #54; spec §56).
+"""Material-change decision for observation writes (spec §56).
 Pure, no I/O.
 
 "An observation row represents a period during which a value held, not a

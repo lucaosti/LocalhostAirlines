@@ -1,4 +1,4 @@
-"""Observation writes with material-change dedup (issue #54; spec §56).
+"""Observation writes with material-change dedup (spec §56).
 
 Bridges the pure decision in domain/collection/material_change.py to
 persistence: finds the current open period for (itinerary_id, source), if

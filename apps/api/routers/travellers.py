@@ -204,7 +204,7 @@ class CompanionIn(BaseModel):
     companion_id: str
     # No default. Omitting this field is a 422, not a silent NOT_COMBINABLE —
     # the safe default must be a decision the caller makes, not one the API
-    # makes for them (spec §9, issue #13).
+    # makes for them (spec §9).
     points_relationship: PointsRelationship
 
 

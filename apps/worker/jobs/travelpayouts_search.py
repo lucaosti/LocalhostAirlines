@@ -1,12 +1,11 @@
 """Runs one M1 walking-skeleton search: fetch -> retain raw -> normalize ->
-persist (issues #43, #52, #54, #56).
+persist.
 
-fetch (providers.travelpayouts.client, issue #41), guarded by a per-source
-circuit breaker (issue #56, spec §21/§25 — repeated source-side failures
-stop further calls rather than retrying harder) -> raw retention (issue
-#52, spec §4/§55) -> normalize (normalization.travelpayouts, issue #42) ->
-quality gate -> write with material-change dedup (spec §56's real write
-order, issue #54). No partitioning yet — that is issue #53.
+fetch (providers.travelpayouts.client), guarded by a per-source circuit
+breaker (spec §21/§25 — repeated source-side failures stop further calls
+rather than retrying harder) -> raw retention (spec §4/§55) -> normalize
+(normalization.travelpayouts) -> quality gate -> write with material-change
+dedup (spec §56's real write order).
 """
 
 from __future__ import annotations
@@ -69,11 +68,11 @@ async def run_travelpayouts_search(
         search = await _get_search(db, search_id)
         now = datetime.now(UTC)
         for offer in offers:
-            # Material-change dedup (spec §56, issue #54): extends the
-            # existing period for this itinerary+source if the price is
-            # unchanged, rather than writing a new row per poll — required
-            # for percentile correctness once a scheduled re-collection
-            # (issue #56) polls the same route daily.
+            # Material-change dedup (spec §56): extends the existing period
+            # for this itinerary+source if the price is unchanged, rather
+            # than writing a new row per poll — required for percentile
+            # correctness once a scheduled re-collection polls the same
+            # route daily.
             await write_observation(
                 db,
                 offer=offer,
@@ -122,7 +121,7 @@ async def _run(search_id: str, fetch: Any) -> list:
 
         # Checked inside the same session as the lookups above so a
         # currently-open circuit is rejected before a token check or fetch
-        # is even attempted (issue #56).
+        # is even attempted.
         if not await may_call(db, SOURCE_ID):
             raise SourceError(
                 SourceErrorKind.BLOCKED,

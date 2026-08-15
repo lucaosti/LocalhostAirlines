@@ -26,8 +26,8 @@ from infrastructure.logging import configure_logging
 # models.py), so a cross-module ForeignKey string reference like
 # Search.user_id -> "users.id" fails to resolve at flush time unless
 # something in this process has already imported models.py too. Discovered
-# for real running issue #44's UI against this worker: the first search ever
-# enqueued failed with NoReferencedTableError, not a fixture gap.
+# for real running the SPA against this worker end to end: the first search
+# ever enqueued failed with NoReferencedTableError, not a fixture gap.
 from infrastructure.postgres import (  # noqa: F401
     models,
     models_aggregates,

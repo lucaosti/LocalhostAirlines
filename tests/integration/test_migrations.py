@@ -1,4 +1,4 @@
-"""Migration round-trip test (issue #9 acceptance criteria).
+"""Migration round-trip test.
 
 Requires a live PostgreSQL reachable at DATABASE_URL — provided as a service
 container in CI (see .github/workflows/ci.yml) and started manually for local runs.

@@ -1,10 +1,9 @@
-"""Travelpayouts Data API adapter (issue #41; spec §20, §89 item 1; docs/providers.md).
+"""Travelpayouts Data API adapter (spec §20, §89 item 1; docs/providers.md).
 
 DISCOVERY layer only: knows HTTP, auth and this source's failure modes.
 Knows nothing about the canonical flight model — that split is
-normalization's job (issue #42, spec §5), kept separate so a parser fix can
-be re-run against retained raw payloads without recontacting the source
-(spec §4).
+normalization's job (spec §5), kept separate so a parser fix can be re-run
+against retained raw payloads without recontacting the source (spec §4).
 
 Endpoint contract (`GET /v1/prices/calendar`) confirmed against the vendor's
 own published API reference before writing this, not assumed — same
@@ -41,8 +40,8 @@ async def fetch_price_calendar(
 ) -> dict:
     """Raw fetch only — returns the parsed JSON body untouched.
 
-    Callers get a raw payload; normalization (issue #42) is the only layer
-    that interprets its fields, per the adapter contract's first rule
+    Callers get a raw payload; normalization is the only layer that
+    interprets its fields, per the adapter contract's first rule
     (docs/providers.md "Adapter contract").
 
     `_transport` is keyword-only and defaults to real network access — tests

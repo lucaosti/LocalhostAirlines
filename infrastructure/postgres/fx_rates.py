@@ -1,4 +1,4 @@
-"""FX rate lookups (issue #15 acceptance criteria, spec P2 provenance).
+"""FX rate lookups (spec P2 provenance).
 
 `rate_as_of` is the one place that implements "convert using the rate in
 effect on a given date, falling back to the preceding available date on

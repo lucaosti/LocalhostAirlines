@@ -1,4 +1,4 @@
-"""Partition maintenance and raw-payload retention job (issue #53; spec §55).
+"""Partition maintenance and raw-payload retention job (spec §55).
 
 Runs monthly: extends both partitioned tables' rolling window forward, and
 drops `raw_payloads` partitions past the 12-month retention window.

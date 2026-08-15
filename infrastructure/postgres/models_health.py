@@ -1,4 +1,4 @@
-"""Per-source health persistence (issue #56; spec §21, §25).
+"""Per-source health persistence (spec §21, §25).
 
 One row per source, updated in place — health is current state, not a
 history (the observation/raw-payload tables already are the history, per

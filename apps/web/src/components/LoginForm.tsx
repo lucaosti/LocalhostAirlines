@@ -4,7 +4,7 @@ import type { UserResponse } from "../api/client";
 import { ApiError, login } from "../api/client";
 
 /**
- * Minimal login gate for the M1 walking-skeleton demo (issue #44). The SPA
+ * Minimal login gate for the M1 walking-skeleton demo. The SPA
  * has no session-restoration or logout UI yet — those belong to a proper
  * auth screen, out of scope here; this exists only so the search page below
  * it has something to authenticate against in a real browser.

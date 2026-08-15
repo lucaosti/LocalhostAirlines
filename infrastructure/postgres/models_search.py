@@ -12,11 +12,12 @@ second source has exercised the shape would be guessing at spec §57's real
 aggregate schema before it exists. JSONB here is a deliberate simplification,
 not the final storage shape.
 
-Issue #54 moved this to the real spec §56 shape: a row is a period during
-which a value held (`first_seen_at`/`last_seen_at`/`poll_count`), not one row
-per fetch. Its identity is `(itinerary_id, source)`, not the `Search` that
-happened to produce it — a scheduled re-collection run (issue #56) creates a
-*new* `Search` row every day for the same route, and must extend the same
+A row is a period during which a value held (`first_seen_at`/`last_seen_at`/
+`poll_count`), not one row per fetch (spec §56) — one row per poll would let
+polling frequency masquerade as market volatility once percentiles are
+computed over it. Its identity is `(itinerary_id, source)`, not the `Search`
+that happened to produce it — a scheduled re-collection run creates a *new*
+`Search` row every day for the same route, and must extend the same
 observation period rather than starting a new one each time. `last_search_id`
 keeps a pointer to whichever search most recently touched the row, for
 provenance/debugging only; it carries no identity meaning.
@@ -116,20 +117,19 @@ class CashObservation(Base):
 
     # spec §56: a row is a period during which a value held, not one row per
     # poll. An unchanged repeat poll extends last_seen_at and increments
-    # poll_count instead of writing a new row (issue #54,
+    # poll_count instead of writing a new row (decided in
     # domain/collection/material_change.py).
     #
-    # Part of the primary key (issue #53) — Postgres requires the partition
-    # column on every unique constraint of a partitioned table. Never
-    # rewritten after insert, so this does not mean a row can move
-    # partitions during its life.
+    # Part of the primary key — Postgres requires the partition column on
+    # every unique constraint of a partitioned table. Never rewritten after
+    # insert, so this does not mean a row can move partitions during its life.
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     poll_count: Mapped[int] = mapped_column(Integer, default=1)
 
     # Provenance only (module docstring) — nullable because a row can outlive
     # the Search that first created it, and a future non-interactive source
-    # (issue #56's scheduler creates one per run, but a later source might
+    # (the scheduler creates one Search per run, but a later source might
     # not go through Search at all).
     last_search_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("searches.id"), nullable=True

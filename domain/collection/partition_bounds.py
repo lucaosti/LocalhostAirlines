@@ -1,4 +1,4 @@
-"""Monthly partition naming and bounds (issue #53; spec §55). Pure, no I/O.
+"""Monthly partition naming and bounds (spec §55). Pure, no I/O.
 
 Partitions are runtime objects maintained by a scheduled job, not
 represented in migrations (spec §55's own stated split) — this module is

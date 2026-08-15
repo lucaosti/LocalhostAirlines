@@ -1,4 +1,4 @@
-"""FX rate ingestion and lookup against real Postgres (issue #15 acceptance criteria).
+"""FX rate ingestion and lookup against real Postgres.
 
 Uses fictional currency codes (ZZx) per test, never a real ISO code — this
 table is never truncated between tests (matching the existing convention in

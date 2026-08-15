@@ -134,7 +134,7 @@ jobs:
         # which is why every run: value with a literal "#" in this file uses
         # a block scalar instead.
         run: |
-          echo "apps/web does not exist yet (lands in issue #11) - nothing to check."
+          echo "apps/web does not exist yet - nothing to check."
 
   docker-build:
     runs-on: ubuntu-latest
@@ -178,5 +178,5 @@ jobs:
             fi
           done
           if [ "$found" = false ]; then
-            echo "No Dockerfiles yet (land in issue #7) - nothing to build."
+            echo "No Dockerfiles yet - nothing to build."
           fi

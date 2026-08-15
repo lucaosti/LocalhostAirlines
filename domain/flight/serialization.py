@@ -1,6 +1,6 @@
 """FlightOffer <-> plain-dict conversion. Pure, no I/O.
 
-Used by issue #43's persistence layer to store a FlightOffer as JSONB (see
+Used by the persistence layer to store a FlightOffer as JSONB (see
 infrastructure/postgres/models_search.py for why) and by the API layer to
 read it back into the same dataclass shape rather than working with a bare
 dict past the boundary where it was written.

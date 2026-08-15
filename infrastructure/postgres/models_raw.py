@@ -1,4 +1,4 @@
-"""Raw payload retention (issue #52; spec §4, §55).
+"""Raw payload retention (spec §4, §55).
 
 Raw payloads are the reprocessing safety net: "when a parser breaks — and
 parsers for unofficial sources break routinely — the raw payloads already
@@ -6,9 +6,9 @@ collected can be reprocessed against the fixed parser" (spec §4). Compressed
 at rest since raw JSON is repetitive and compresses well (empirically
 estimated ~5:1 in docs/adr/0007-observation-volume-estimate.md).
 
-Source-agnostic shape (not Travelpayouts-specific) so #14/#15's adapters can
-adopt the same table later without a schema change, even though issue #52
-only wires up Travelpayouts for now.
+Source-agnostic shape (not Travelpayouts-specific) so the reference-data and
+FX adapters can adopt the same table later without a schema change, even
+though only Travelpayouts writes to it for now.
 
 Retention (12 months, spec §55) is enforced by
 infrastructure/postgres/partitions.py dropping whole old partitions, not row
@@ -44,7 +44,7 @@ class RawPayload(Base):
     source: Mapped[str] = mapped_column(String(64))
     # Identifies what request produced this payload, e.g. "MXP-NRT:2026-10"
     # for a Travelpayouts price-calendar fetch — not a foreign key, since a
-    # scheduled collection run (issue #56) may have no Search row at all.
+    # scheduled collection run may have no Search row at all.
     request_key: Mapped[str] = mapped_column(String(256))
 
     content_encoding: Mapped[str] = mapped_column(String(16), default="gzip")

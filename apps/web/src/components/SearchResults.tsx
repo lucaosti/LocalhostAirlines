@@ -2,11 +2,10 @@ import type { ObservationResponse } from "../api/client";
 import { ValuedDisplay } from "./ValuedDisplay";
 
 /**
- * Renders the M1 search's results (issue #44). An empty list here means "the
- * search completed and found nothing" — structurally distinct from the
- * loading state the caller shows before the search reaches READY, per this
- * issue's own acceptance criterion (a NOT_AVAILABLE-shaped result must not
- * look identical to still-loading).
+ * Renders the M1 search's results. An empty list here means "the search
+ * completed and found nothing" — structurally distinct from the loading
+ * state the caller shows before the search reaches READY: a NOT_AVAILABLE-
+ * shaped result must not look identical to still-loading (spec P3).
  */
 export function SearchResults({ observations }: { observations: ObservationResponse[] }) {
   if (observations.length === 0) {

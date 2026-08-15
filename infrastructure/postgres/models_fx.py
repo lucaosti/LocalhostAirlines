@@ -1,4 +1,4 @@
-"""FX rate persistence (issue #15).
+"""FX rate persistence (spec §82).
 
 ECB never revises a published daily rate, so a row here is an immutable
 historical fact once written: ingestion is insert-or-skip, never update

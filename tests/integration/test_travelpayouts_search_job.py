@@ -1,4 +1,4 @@
-"""apps/worker/jobs/travelpayouts_search.py against real Postgres (issue #43).
+"""apps/worker/jobs/travelpayouts_search.py against real Postgres.
 
 Network-free: the job's _fetch is injected, same pattern as every other job
 in this project (apps/worker/jobs/reference_data.py, fx_rates.py).

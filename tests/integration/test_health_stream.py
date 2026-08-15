@@ -1,4 +1,4 @@
-"""Regression test for the SSE probe (issue #16).
+"""Regression test for the SSE probe.
 
 Verified manually first against the real stack through Caddy — curl
 --no-buffer showed heartbeat events arriving one per second rather than all

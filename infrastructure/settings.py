@@ -42,6 +42,13 @@ class Settings(BaseSettings):
         default=300, alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS"
     )
 
+    # Applied when a search request omits `budget` (docs/api.md §5 "Create":
+    # "Omitting budget applies the profile default"). Traveller profiles have
+    # no per-profile budget field yet, so this is the system-wide default
+    # until one exists — the same 100 calls/day figure docs/adr/0007's own
+    # storage-growth estimate assumes, not a number invented separately here.
+    default_search_budget_calls: int = Field(default=100, alias="DEFAULT_SEARCH_BUDGET_CALLS")
+
     @field_validator("secret_key")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:

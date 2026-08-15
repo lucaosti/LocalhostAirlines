@@ -1,21 +1,22 @@
-"""M1 walking-skeleton search: one source, one route (docs/api.md §5, §7).
+"""Full multi-origin/destination search resource (docs/api.md §5, §7; spec
+§27, §29, §31, §32).
 
-Deliberately not the full search resource from docs/api.md §5 — no
-multi-origin/destination expansion, no query budget, no SSE. Those are the
-M3 extension of this same resource (docs/api.md §5's own "extended through
-M3" tag), built once the search engine that needs them exists. This is the
-thin M1 slice: one origin, one destination, one month, one source.
+Creation only expands the search space and computes its size (`space_total`)
+synchronously — the source calls themselves are enqueued, never run inline
+(CLAUDE.md §6: "no user request ever blocks on a browser [or source call]").
+The actual expansion -> batching -> budget -> fetch -> gate -> filter pipeline
+runs in apps/worker/jobs/travelpayouts_search.py.
 """
 
 from __future__ import annotations
 
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from arq import ArqRedis
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,22 +24,22 @@ from apps.api.auth.dependencies import get_current_user
 from apps.api.dependencies import get_arq_pool, get_session
 from apps.api.errors import NotFoundProblem
 from domain.flight.serialization import offer_from_dict
+from domain.search.expansion import SearchQuery, WeightedLocation, expand
 from infrastructure.postgres.models import User
 from infrastructure.postgres.models_search import CashObservation, Search, SearchState
 from infrastructure.schema import UtcDatetime
+from infrastructure.settings import get_settings
 
 router = APIRouter(prefix="/searches", tags=["searches"])
 
 _IATA = re.compile(r"^[A-Z]{3}$")
-_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
-class SearchIn(BaseModel):
-    origin: str = Field(min_length=3, max_length=3)
-    destination: str = Field(min_length=3, max_length=3)
-    depart_month: str
+class LocationIn(BaseModel):
+    code: str = Field(min_length=3, max_length=3)
+    weight: int = Field(default=0, ge=0, le=100)
 
-    @field_validator("origin", "destination")
+    @field_validator("code")
     @classmethod
     def iata_uppercase(cls, v: str) -> str:
         v = v.upper()
@@ -46,35 +47,87 @@ class SearchIn(BaseModel):
             raise ValueError(f"'{v}' is not a 3-letter IATA code")
         return v
 
-    @field_validator("depart_month")
-    @classmethod
-    def month_shape(cls, v: str) -> str:
-        if not _MONTH.match(v):
-            raise ValueError(f"'{v}' is not a YYYY-MM month")
-        return v
+
+class BudgetIn(BaseModel):
+    calls: int = Field(gt=0)
+
+
+class SearchIn(BaseModel):
+    traveller_profile_id: str | None = None
+    origins: list[LocationIn] = Field(min_length=1)
+    destinations: list[LocationIn] = Field(min_length=1)
+    date_start: date
+    date_end: date
+    min_nights: int = Field(ge=0)
+    max_nights: int = Field(ge=0)
+    cabins: list[str] = Field(min_length=1)
+    max_stops: int | None = Field(default=None, ge=0)
+    hard_filters: dict = Field(default_factory=dict)
+    budget: BudgetIn | None = None
+
+    @model_validator(mode="after")
+    def date_range_is_ordered(self) -> SearchIn:
+        if self.date_end < self.date_start:
+            raise ValueError("date_end must not be before date_start")
+        return self
+
+    @model_validator(mode="after")
+    def nights_range_is_ordered(self) -> SearchIn:
+        if self.max_nights < self.min_nights:
+            raise ValueError("max_nights must not be less than min_nights")
+        return self
+
+
+class SpaceOut(BaseModel):
+    total: int
+    explored: int
+    not_explored: int
+
+
+class BudgetOut(BaseModel):
+    calls: int
+    spent: int
+    remaining: int
+
+
+class SourceOut(BaseModel):
+    source: str
+    state: str
+    results: int
+    reason: dict | None = None
 
 
 class SearchResponse(BaseModel):
     id: str
     state: str
-    origin: str
-    destination: str
-    depart_month: str
-    failure_reason: str | None
     created_at: UtcDatetime
     completed_at: UtcDatetime | None
+    space: SpaceOut
+    budget: BudgetOut
+    sources: list[SourceOut]
+    result_count: int
+    failure_reason: str | None
 
 
-def _to_response(search: Search) -> SearchResponse:
+def _to_response(search: Search, *, result_count: int) -> SearchResponse:
     return SearchResponse(
         id=str(search.id),
         state=search.state.value,
-        origin=search.origin,
-        destination=search.destination,
-        depart_month=search.depart_month,
-        failure_reason=search.failure_reason,
         created_at=search.created_at,
         completed_at=search.completed_at,
+        space=SpaceOut(
+            total=search.space_total,
+            explored=search.space_explored,
+            not_explored=search.space_total - search.space_explored,
+        ),
+        budget=BudgetOut(
+            calls=search.budget_calls,
+            spent=search.budget_spent,
+            remaining=search.budget_calls - search.budget_spent,
+        ),
+        sources=[SourceOut(**source) for source in search.sources],
+        result_count=result_count,
+        failure_reason=search.failure_reason,
     )
 
 
@@ -85,12 +138,44 @@ async def create_search(
     db: AsyncSession = Depends(get_session),
     arq_pool: ArqRedis = Depends(get_arq_pool),
 ) -> SearchResponse:
+    budget_calls = body.budget.calls if body.budget else get_settings().default_search_budget_calls
+
+    query = SearchQuery(
+        origins=tuple(WeightedLocation(loc.code, loc.weight) for loc in body.origins),
+        destinations=tuple(WeightedLocation(loc.code, loc.weight) for loc in body.destinations),
+        date_start=body.date_start,
+        date_end=body.date_end,
+        min_nights=body.min_nights,
+        max_nights=body.max_nights,
+        cabins=tuple(body.cabins),
+    )
+    space_total = len(expand(query))
+
+    traveller_profile_uuid = None
+    if body.traveller_profile_id is not None:
+        try:
+            traveller_profile_uuid = uuid.UUID(body.traveller_profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="invalid traveller_profile_id") from exc
+
     search = Search(
         id=uuid.uuid4(),
         user_id=user.id,
-        origin=body.origin,
-        destination=body.destination,
-        depart_month=body.depart_month,
+        traveller_profile_id=traveller_profile_uuid,
+        origins=[{"code": loc.code, "weight": loc.weight} for loc in body.origins],
+        destinations=[{"code": loc.code, "weight": loc.weight} for loc in body.destinations],
+        date_start=body.date_start,
+        date_end=body.date_end,
+        min_nights=body.min_nights,
+        max_nights=body.max_nights,
+        cabins=list(body.cabins),
+        max_stops=body.max_stops,
+        hard_filters=body.hard_filters,
+        budget_calls=budget_calls,
+        budget_spent=0,
+        space_total=space_total,
+        space_explored=0,
+        sources=[],
         state=SearchState.PENDING,
         created_at=datetime.now(UTC),
     )
@@ -103,7 +188,7 @@ async def create_search(
     # handler"; a search trigger is exactly that explicit request).
     await arq_pool.enqueue_job("run_travelpayouts_search", str(search.id))
 
-    return _to_response(search)
+    return _to_response(search, result_count=0)
 
 
 @router.get("/{search_id}", response_model=SearchResponse)
@@ -113,7 +198,8 @@ async def get_search(
     db: AsyncSession = Depends(get_session),
 ) -> SearchResponse:
     search = await _get_owned_search(db, search_id, user)
-    return _to_response(search)
+    result_count = await _count_results(db, search)
+    return _to_response(search, result_count=result_count)
 
 
 class ObservationResponse(BaseModel):
@@ -134,25 +220,7 @@ async def get_search_results(
     db: AsyncSession = Depends(get_session),
 ) -> list[ObservationResponse]:
     search = await _get_owned_search(db, search_id, user)  # 404/403 before leaking results
-
-    # Queried by route, not by search_id: an observation's identity is
-    # (itinerary_id, source) and it outlives any one Search — a scheduled
-    # re-collection extends the same row rather than creating a fresh one
-    # tied to its own run. "This search's results" means "this route's
-    # current observations".
-    rows = (
-        (
-            await db.execute(
-                select(CashObservation).where(
-                    CashObservation.origin == search.origin,
-                    CashObservation.destination == search.destination,
-                    CashObservation.depart_month == search.depart_month,
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
+    rows = await _fetch_result_rows(db, search)
 
     results = []
     for row in rows:
@@ -204,6 +272,51 @@ async def get_search_results(
             )
         )
     return results
+
+
+def _route_pairs(search: Search) -> list[tuple[str, str]]:
+    return [
+        (origin["code"], destination["code"])
+        for origin in search.origins
+        for destination in search.destinations
+    ]
+
+
+def _month_range(search: Search) -> list[str]:
+    months = []
+    year, month = search.date_start.year, search.date_start.month
+    end_year, end_month = search.date_end.year, search.date_end.month
+    while (year, month) <= (end_year, end_month):
+        months.append(f"{year:04d}-{month:02d}")
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    return months
+
+
+async def _fetch_result_rows(db: AsyncSession, search: Search) -> list[CashObservation]:
+    # An observation's identity is (itinerary_id, source), not this search
+    # (spec §56) — it outlives any one search, and a scheduled re-collection
+    # extends the same row rather than creating a fresh one. "This search's
+    # results" means "this search's routes' current observations" within its
+    # own date range.
+    routes = _route_pairs(search)
+    months = _month_range(search)
+    if not routes or not months:
+        return []
+
+    rows = (
+        (await db.execute(select(CashObservation).where(CashObservation.depart_month.in_(months))))
+        .scalars()
+        .all()
+    )
+    route_set = set(routes)
+    return [row for row in rows if (row.origin, row.destination) in route_set]
+
+
+async def _count_results(db: AsyncSession, search: Search) -> int:
+    return len(await _fetch_result_rows(db, search))
 
 
 async def _get_owned_search(db: AsyncSession, search_id: str, user: User) -> Search:

@@ -6,7 +6,7 @@ normalization fails on it — that is the entire point of retaining it
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import select
@@ -85,9 +85,18 @@ async def _seed_user_and_search(origin: str, destination: str) -> uuid.UUID:
             Search(
                 id=search_id,
                 user_id=user_id,
-                origin=origin,
-                destination=destination,
-                depart_month="2026-10",
+                origins=[{"code": origin, "weight": 0}],
+                destinations=[{"code": destination, "weight": 0}],
+                date_start=date(2026, 10, 1),
+                date_end=date(2026, 10, 1),
+                min_nights=0,
+                max_nights=0,
+                cabins=["economy"],
+                budget_calls=1,
+                budget_spent=0,
+                space_total=0,
+                space_explored=0,
+                sources=[],
                 state=SearchState.PENDING,
                 created_at=now,
             )
@@ -144,9 +153,18 @@ async def test_raw_payload_survives_normalization_failure(monkeypatch) -> None:
 
     async with session_scope() as db:
         search = await db.get(Search, search_id)
-        # The job itself correctly failed on the malformed entry...
-        assert search.state == SearchState.FAILED
-        assert search.failure_reason == "schema_change"
+        # The search itself still reaches READY (spec §31: READY means every
+        # configured source has completed, failed or timed out — not that
+        # every source succeeded); the failure is recorded per-source.
+        assert search.state == SearchState.READY
+        assert search.sources == [
+            {
+                "source": "travelpayouts",
+                "state": "failed",
+                "results": 0,
+                "reason": {"code": "schema_change"},
+            }
+        ]
 
         # ...but the raw payload that caused the failure is still there,
         # exactly the case spec §4 exists for: a parser fix can be re-run

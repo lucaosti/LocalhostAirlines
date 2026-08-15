@@ -30,6 +30,21 @@ class _FakeArqPool:
         self.enqueued.append((function, args))
 
 
+def _search_body(**overrides) -> dict:
+    body = {
+        "origins": [{"code": "mxp", "weight": 100}],
+        "destinations": [{"code": "nrt"}],
+        "date_start": "2026-10-01",
+        "date_end": "2026-10-05",
+        "min_nights": 7,
+        "max_nights": 10,
+        "cabins": ["economy"],
+        "budget": {"calls": 5},
+    }
+    body.update(overrides)
+    return body
+
+
 async def _create_user_and_login(client: AsyncClient, username: str) -> None:
     now = datetime.now(UTC)
     async with session_scope() as db:
@@ -60,14 +75,15 @@ async def test_create_search_enqueues_job_and_returns_pending() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await _create_user_and_login(client, "search-api-1")
 
-            response = await client.post(
-                "/api/v1/searches",
-                json={"origin": "mxp", "destination": "nrt", "depart_month": "2026-10"},
-            )
+            response = await client.post("/api/v1/searches", json=_search_body())
             assert response.status_code == 202
             body = response.json()
             assert body["state"] == "pending"
-            assert body["origin"] == "MXP"  # normalized uppercase
+            # 5 dates x 4 nights x 1 cabin = 20 tasks in the full expansion.
+            assert body["space"]["total"] == 20
+            assert body["space"]["explored"] == 0
+            assert body["space"]["not_explored"] == 20
+            assert body["budget"] == {"calls": 5, "spent": 0, "remaining": 5}
 
             assert fake_pool.enqueued == [("run_travelpayouts_search", (body["id"],))]
     finally:
@@ -75,7 +91,25 @@ async def test_create_search_enqueues_job_and_returns_pending() -> None:
 
 
 @pytest.mark.integration
-async def test_create_search_rejects_malformed_month() -> None:
+async def test_create_search_omitting_budget_applies_default() -> None:
+    fake_pool = _FakeArqPool()
+    app.dependency_overrides[get_arq_pool] = lambda: fake_pool
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await _create_user_and_login(client, "search-api-default-budget")
+
+            body = _search_body()
+            del body["budget"]
+            response = await client.post("/api/v1/searches", json=body)
+            assert response.status_code == 202
+            assert response.json()["budget"]["calls"] > 0
+    finally:
+        app.dependency_overrides.pop(get_arq_pool, None)
+
+
+@pytest.mark.integration
+async def test_create_search_rejects_date_end_before_date_start() -> None:
     fake_pool = _FakeArqPool()
     app.dependency_overrides[get_arq_pool] = lambda: fake_pool
     try:
@@ -85,7 +119,25 @@ async def test_create_search_rejects_malformed_month() -> None:
 
             response = await client.post(
                 "/api/v1/searches",
-                json={"origin": "MXP", "destination": "NRT", "depart_month": "not-a-month"},
+                json=_search_body(date_start="2026-10-10", date_end="2026-10-01"),
+            )
+            assert response.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_arq_pool, None)
+
+
+@pytest.mark.integration
+async def test_create_search_rejects_malformed_iata_code() -> None:
+    fake_pool = _FakeArqPool()
+    app.dependency_overrides[get_arq_pool] = lambda: fake_pool
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            await _create_user_and_login(client, "search-api-3")
+
+            response = await client.post(
+                "/api/v1/searches",
+                json=_search_body(origins=[{"code": "not-a-code"}]),
             )
             assert response.status_code == 422
     finally:
@@ -100,10 +152,7 @@ async def test_get_search_not_owned_by_caller_is_404() -> None:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await _create_user_and_login(client, "search-api-owner")
-            created = await client.post(
-                "/api/v1/searches",
-                json={"origin": "MXP", "destination": "NRT", "depart_month": "2026-10"},
-            )
+            created = await client.post("/api/v1/searches", json=_search_body())
             search_id = created.json()["id"]
 
         transport2 = ASGITransport(app=app)
@@ -123,15 +172,15 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await _create_user_and_login(client, "search-api-results")
-            # Results are now queried by route, not by search_id (issue
-            # #54) — a route unique to this test avoids picking up other
-            # tests' observations for the common MXP-NRT fixture route.
-            # Letters only: the API's IATA validator rejects digits, which
-            # a hex-derived code would sometimes contain.
+            # Results are queried by route, not by search_id (spec §56) — a
+            # route unique to this test avoids picking up other tests'
+            # observations for a common fixture route. Letters only: the
+            # API's IATA validator rejects digits, which a hex-derived code
+            # would sometimes contain.
             origin = "Z" + "".join(random.choices(string.ascii_uppercase, k=2))
             created = await client.post(
                 "/api/v1/searches",
-                json={"origin": origin, "destination": "NRT", "depart_month": "2026-10"},
+                json=_search_body(origins=[{"code": origin}]),
             )
             search_id = created.json()["id"]
 
@@ -147,9 +196,9 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
                         last_search_id=search.id,
                         itinerary_id="deadbeef",
                         source="travelpayouts",
-                        origin=search.origin,
-                        destination=search.destination,
-                        depart_month=search.depart_month,
+                        origin=origin,
+                        destination="NRT",
+                        depart_month="2026-10",
                         price_minor=61200,
                         currency="EUR",
                         freshness="cached",
@@ -172,7 +221,7 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
                                 {
                                     "segments": [
                                         {
-                                            "origin": "MXP",
+                                            "origin": origin,
                                             "destination": "NRT",
                                             "departure_utc": "2026-10-01T09:15:00+00:00",
                                             "arrival_utc": None,
@@ -206,7 +255,10 @@ async def test_results_reflect_stored_observations_with_provenance() -> None:
             assert results[0]["price"]["value"]["amount_minor"] == 61200
             assert results[0]["price"]["state"] == "AVAILABLE"
             assert results[0]["price"]["freshness"] == "cached"
-            assert results[0]["slices"][0]["segments"][0]["origin"] == "MXP"
+            assert results[0]["slices"][0]["segments"][0]["origin"] == origin
             assert results[0]["limitations"]
+
+            search_response = await client.get(f"/api/v1/searches/{search_id}")
+            assert search_response.json()["result_count"] == 1
     finally:
         app.dependency_overrides.pop(get_arq_pool, None)

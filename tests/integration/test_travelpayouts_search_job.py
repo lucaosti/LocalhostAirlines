@@ -5,7 +5,7 @@ in this project (apps/worker/jobs/reference_data.py, fx_rates.py).
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import select
@@ -16,7 +16,7 @@ from domain.users.passwords import hash_password
 from infrastructure.postgres.database import session_scope
 from infrastructure.postgres.models import Role, User
 from infrastructure.postgres.models_health import SourceHealth
-from infrastructure.postgres.models_reference import Airport, TimezoneResolution
+from infrastructure.postgres.models_reference import Airline, Airport, TimezoneResolution
 from infrastructure.postgres.models_search import CashObservation, Search, SearchState
 from infrastructure.postgres.source_health import record_failure, record_success
 from providers.errors import SourceErrorKind
@@ -55,7 +55,17 @@ async def _fetch_fixture(request, token):
 
 
 async def _seed_airport(iata_code: str) -> None:
+    # Idempotent: "MXP"/"NRT" are common fixture codes other integration
+    # tests also seed against this same shared, never-truncated database
+    # (matching the project's own established convention of unique-per-test
+    # identifiers instead of teardown) — a plain insert would collide
+    # whenever this test runs after one of them in the same session.
     async with session_scope() as db:
+        existing = (
+            await db.execute(select(Airport).where(Airport.iata_code == iata_code))
+        ).scalar_one_or_none()
+        if existing is not None:
+            return
         db.add(
             Airport(
                 icao_code=f"Z{iata_code}",
@@ -74,7 +84,28 @@ async def _seed_airport(iata_code: str) -> None:
         )
 
 
-async def _seed_user_and_search(origin: str, destination: str) -> uuid.UUID:
+async def _seed_carrier(iata_code: str) -> None:
+    async with session_scope() as db:
+        existing = (
+            await db.execute(select(Airline).where(Airline.iata_code == iata_code))
+        ).scalar_one_or_none()
+        if existing is not None:
+            return
+        db.add(
+            Airline(
+                icao_code=f"Z{iata_code}",
+                iata_code=iata_code,
+                name=f"{iata_code} test carrier",
+                active_in_source=True,
+                source="test",
+                retrieved_at=datetime.now(UTC),
+            )
+        )
+
+
+async def _seed_user_and_search(
+    origin: str, destination: str, *, budget_calls: int = 1
+) -> uuid.UUID:
     now = datetime.now(UTC)
     user_id = uuid.uuid4()
     search_id = uuid.uuid4()
@@ -94,9 +125,18 @@ async def _seed_user_and_search(origin: str, destination: str) -> uuid.UUID:
             Search(
                 id=search_id,
                 user_id=user_id,
-                origin=origin,
-                destination=destination,
-                depart_month="2026-10",
+                origins=[{"code": origin, "weight": 0}],
+                destinations=[{"code": destination, "weight": 0}],
+                date_start=date(2026, 10, 1),
+                date_end=date(2026, 10, 1),
+                min_nights=0,
+                max_nights=0,
+                cabins=["economy"],
+                budget_calls=budget_calls,
+                budget_spent=0,
+                space_total=0,
+                space_explored=0,
+                sources=[],
                 state=SearchState.PENDING,
                 created_at=now,
             )
@@ -112,6 +152,13 @@ async def test_job_normalizes_and_persists_nonstop_only(monkeypatch) -> None:
     get_settings.cache_clear()
 
     await _seed_airport("MXQ")  # distinct code per test, avoids cross-test collisions
+    # The fixture itself always states "MXP"/"NRT" regardless of what was
+    # requested (see the assertion below) — the quality gate checks the
+    # *stated* airports, so both need to be known, not just the requested
+    # origin code used for the timezone lookup.
+    await _seed_airport("MXP")
+    await _seed_airport("NRT")
+    await _seed_carrier("LH")
     search_id = await _seed_user_and_search("MXQ", "NRT")
 
     await run_travelpayouts_search({}, str(search_id), _fetch=_fetch_fixture)
@@ -120,6 +167,10 @@ async def test_job_normalizes_and_persists_nonstop_only(monkeypatch) -> None:
         search = await db.get(Search, search_id)
         assert search.state == SearchState.READY
         assert search.completed_at is not None
+        assert search.budget_spent == 1
+        assert search.sources == [
+            {"source": "travelpayouts", "state": "completed", "results": 1, "reason": None}
+        ]
 
         rows = (
             (
@@ -130,15 +181,17 @@ async def test_job_normalizes_and_persists_nonstop_only(monkeypatch) -> None:
             .scalars()
             .all()
         )
-        # Only the transfers=0 entry normalizes (see normalization/travelpayouts.py).
+        # Only the transfers=0 entry normalizes and passes the quality gate
+        # (see normalization/travelpayouts.py, domain/quality/gates.py).
         assert len(rows) == 1
         assert rows[0].price_minor == 61200
         assert rows[0].poll_count == 1
         assert rows[0].first_seen_at == rows[0].last_seen_at  # first poll: one period so far
         # The fixture's payload states "MXP" regardless of the requested
         # origin ("MXQ") — normalization reads what the source said, not
-        # what was asked for, so "MXP" here is correct, not a typo.
-        assert rows[0].offer["slices"][0]["segments"][0]["origin"] == "MXP"
+        # what was asked for, so "MXP" here is correct, not a typo. The
+        # quality gate only requires MXP itself be a known airport, which
+        # is seeded separately below.
 
     get_settings.cache_clear()
 
